@@ -40,18 +40,14 @@ export default function App() {
 
   const showToast = (msg, type = 'success') => {
     setToast({ show: true, msg, type });
-    setTimeout(() => {
-      setToast({ show: false, msg: '', type: 'success' });
-    }, 3000);
+    setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 3000);
   };
 
   const showConfirm = (msg, onConfirmCallback) => {
     setDialog({ show: true, msg, onConfirm: onConfirmCallback });
   };
 
-  const closeConfirm = () => {
-    setDialog({ show: false, msg: '', onConfirm: null });
-  };
+  const closeConfirm = () => setDialog({ show: false, msg: '', onConfirm: null });
 
   const showPrompt = (title, placeholder, type, onSubmitCallback) => {
     setInputValue('');
@@ -65,9 +61,7 @@ export default function App() {
   const checkSession = async () => {
     try {
       const savedSession = JSON.parse(localStorage.getItem('lila_sec_protocol'));
-      if (!savedSession) {
-        return setIsLoggedIn(false);
-      }
+      if (!savedSession) return setIsLoggedIn(false);
 
       const res = await fetch('https://api.ipify.org?format=json');
       const { ip } = await res.json();
@@ -81,11 +75,8 @@ export default function App() {
       }
     } catch (error) {
       const savedSession = JSON.parse(localStorage.getItem('lila_sec_protocol'));
-      if (savedSession && savedSession.agent === navigator.userAgent) {
-        setIsLoggedIn(true);
-      } else {
-        setIsLoggedIn(false);
-      }
+      if (savedSession && savedSession.agent === navigator.userAgent) setIsLoggedIn(true);
+      else setIsLoggedIn(false);
     }
   };
 
@@ -96,7 +87,6 @@ export default function App() {
 
   const fetchData = async () => {
     setLoading(true);
-    
     const { data: u } = await supabase.from('users').select('*').order('created_at', { ascending: true });
     const { data: t } = await supabase.from('topups').select('*').order('created_at', { ascending: true });
     const { data: p } = await supabase.from('products').select('*').order('created_at', { ascending: true });
@@ -113,12 +103,10 @@ export default function App() {
     const data = days.map(day => ({ name: day, users: 0, pending: 0, success: 0, revenue: 0 }));
     
     t?.forEach(item => {
-      if (item.created_at) {
+      if(item.created_at) {
         const d = new Date(item.created_at).getDay();
         const idx = d === 0 ? 6 : d - 1; 
-        if (item.status === 'PENDING') {
-          data[idx].pending += 1;
-        }
+        if (item.status === 'PENDING') data[idx].pending += 1;
         if (item.status === 'SUCCESS') {
           data[idx].success += 1;
           data[idx].revenue += (item.amount || 0);
@@ -127,7 +115,7 @@ export default function App() {
     });
 
     u?.forEach(item => {
-      if (item.created_at) {
+      if(item.created_at) {
         const d = new Date(item.created_at).getDay();
         const idx = d === 0 ? 6 : d - 1;
         data[idx].users += 1;
@@ -176,11 +164,8 @@ export default function App() {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        if (target === 'broadcast') {
-          setBcImg(reader.result);
-        } else {
-          setConfig({ ...config, [target]: reader.result });
-        }
+        if (target === 'broadcast') setBcImg(reader.result);
+        else setConfig({ ...config, [target]: reader.result });
       };
       reader.readAsDataURL(file);
     }
@@ -198,21 +183,16 @@ export default function App() {
   };
 
   const sendBroadcast = () => {
-    if (!bcMsg) {
-      return showToast('Isi pesan broadcast terlebih dahulu!', 'error');
-    }
+    if (!bcMsg) return showToast('Isi pesan broadcast terlebih dahulu!', 'error');
     showConfirm(`Kirim sinyal broadcast ke ${users.length} pengguna aktif?`, () => {
       showToast(`BROADCAST DIMULAI! Mengirim ke ${users.length} perangkat.`, 'success');
-      setBcMsg(''); 
-      setBcImg('');
+      setBcMsg(''); setBcImg('');
     });
   };
 
   const handleSaveProduct = async (e) => {
     e.preventDefault();
-    if (!productForm.name || !productForm.price) {
-      return showToast('Nama & Harga wajib diisi!', 'error');
-    }
+    if (!productForm.name || !productForm.price) return showToast('Nama & Harga wajib diisi!', 'error');
 
     const payload = {
       name: productForm.name,
@@ -224,34 +204,20 @@ export default function App() {
 
     if (productForm.id) {
       const { error } = await supabase.from('products').update(payload).eq('id', productForm.id);
-      if (error) {
-        showToast(error.message, 'error');
-      } else {
-        showToast('Produk Berhasil Diperbarui!');
-        fetchData();
-        setProductForm({ id: null, name: '', description: '', price: '', quota_turnitin: '', quota_ai: '' });
-      }
+      if (error) showToast(error.message, 'error');
+      else { showToast('Produk Berhasil Diperbarui!'); fetchData(); setProductForm({ id: null, name: '', description: '', price: '', quota_turnitin: '', quota_ai: '' }); }
     } else {
       const { error } = await supabase.from('products').insert([payload]);
-      if (error) {
-        showToast(error.message, 'error');
-      } else {
-        showToast('Produk Berhasil Ditambahkan!');
-        fetchData();
-        setProductForm({ id: null, name: '', description: '', price: '', quota_turnitin: '', quota_ai: '' });
-      }
+      if (error) showToast(error.message, 'error');
+      else { showToast('Produk Berhasil Ditambahkan!'); fetchData(); setProductForm({ id: null, name: '', description: '', price: '', quota_turnitin: '', quota_ai: '' }); }
     }
   };
 
   const handleDeleteProduct = async (id) => {
     showConfirm('Hapus produk ini secara permanen dari database?', async () => {
       const { error } = await supabase.from('products').delete().eq('id', id);
-      if (error) {
-        showToast(error.message, 'error');
-      } else {
-        showToast('Produk Berhasil Dihapus!');
-        fetchData();
-      }
+      if (error) showToast(error.message, 'error');
+      else { showToast('Produk Berhasil Dihapus!'); fetchData(); }
     });
   };
 
@@ -280,12 +246,8 @@ export default function App() {
           </div>
           <p className="text-center text-white font-bold mb-8">{dialog.msg}</p>
           <div className="flex gap-4">
-            <button onClick={closeConfirm} className="flex-1 py-3 rounded-xl border border-white/10 text-gray-400 hover:bg-white/5 hover:text-white transition-all font-bold text-xs uppercase tracking-widest">
-              BATAL
-            </button>
-            <button onClick={async () => { await dialog.onConfirm(); closeConfirm(); }} className="flex-1 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white transition-all font-bold text-xs uppercase tracking-widest shadow-[0_0_15px_rgba(139,92,246,0.4)]">
-              LANJUTKAN
-            </button>
+            <button onClick={closeConfirm} className="flex-1 py-3 rounded-xl border border-white/10 text-gray-400 hover:bg-white/5 hover:text-white transition-all font-bold text-xs uppercase tracking-widest">BATAL</button>
+            <button onClick={async () => { await dialog.onConfirm(); closeConfirm(); }} className="flex-1 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white transition-all font-bold text-xs uppercase tracking-widest shadow-[0_0_15px_rgba(139,92,246,0.4)]">LANJUTKAN</button>
           </div>
         </div>
       </div>
@@ -298,7 +260,6 @@ export default function App() {
       <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
         <div className="bg-[#0a0a0f] border border-purple-500/30 p-8 rounded-2xl shadow-[0_0_40px_rgba(139,92,246,0.2)] max-w-xl w-full mx-4 animate-in zoom-in-95 duration-200">
           <h3 className="text-center text-purple-400 font-black tracking-widest uppercase mb-6">{inputDialog.title}</h3>
-          
           {inputDialog.type === 'textarea' ? (
             <textarea 
               autoFocus
@@ -317,14 +278,9 @@ export default function App() {
               onChange={(e) => setInputValue(e.target.value)}
             />
           )}
-
           <div className="flex gap-4">
-            <button onClick={closePrompt} className="flex-1 py-3 rounded-xl border border-white/10 text-gray-400 hover:bg-white/5 hover:text-white transition-all font-bold text-xs uppercase tracking-widest">
-              Batal
-            </button>
-            <button onClick={() => { inputDialog.onSubmit(inputValue); closePrompt(); }} className="flex-1 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white transition-all font-bold text-xs uppercase tracking-widest shadow-[0_0_15px_rgba(139,92,246,0.4)]">
-              Kirim
-            </button>
+            <button onClick={closePrompt} className="flex-1 py-3 rounded-xl border border-white/10 text-gray-400 hover:bg-white/5 hover:text-white transition-all font-bold text-xs uppercase tracking-widest">Batal</button>
+            <button onClick={() => { inputDialog.onSubmit(inputValue); closePrompt(); }} className="flex-1 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white transition-all font-bold text-xs uppercase tracking-widest shadow-[0_0_15px_rgba(139,92,246,0.4)]">Kirim</button>
           </div>
         </div>
       </div>
@@ -337,33 +293,17 @@ export default function App() {
         <ToastComponent />
         <div className="absolute w-96 h-96 bg-purple-600/10 blur-[120px] rounded-full top-0 left-0"></div>
         <form onSubmit={handleLogin} className="w-full max-w-md bg-black/40 border border-purple-500/30 p-8 rounded-2xl backdrop-blur-xl z-10 relative shadow-2xl">
-          <h1 className="text-2xl font-black text-center mb-8 tracking-[0.3em] uppercase text-purple-400 drop-shadow-[0_0_8px_rgba(139,92,246,0.4)]">
-            LILA ACCESS
-          </h1>
+          <h1 className="text-2xl font-black text-center mb-8 tracking-[0.3em] uppercase text-purple-400 drop-shadow-[0_0_8px_rgba(139,92,246,0.4)]">LILA ACCESS</h1>
           <div className="space-y-6">
             <div>
               <label className="text-[9px] text-purple-400 block mb-1 tracking-widest">TELEGRAM ID OWNER</label>
-              <input 
-                required 
-                type="text" 
-                className="w-full bg-white/5 border border-purple-500/20 p-4 rounded-xl outline-none focus:border-purple-500 transition-all text-white font-bold" 
-                placeholder="Masukkan ID Telegram" 
-                onChange={e => setLoginData({...loginData, id: e.target.value})} 
-              />
+              <input required type="text" className="w-full bg-white/5 border border-purple-500/20 p-4 rounded-xl outline-none focus:border-purple-500 transition-all text-white font-bold" placeholder="Masukkan ID Telegram" onChange={e => setLoginData({...loginData, id: e.target.value})} />
             </div>
             <div>
               <label className="text-[9px] text-purple-400 block mb-1 tracking-widest">SYSTEM PASSWORD</label>
-              <input 
-                required 
-                type="password" 
-                className="w-full bg-white/5 border border-purple-500/20 p-4 rounded-xl outline-none focus:border-purple-500 transition-all text-white font-bold" 
-                placeholder="••••••••" 
-                onChange={e => setLoginData({...loginData, pass: e.target.value})} 
-              />
+              <input required type="password" className="w-full bg-white/5 border border-purple-500/20 p-4 rounded-xl outline-none focus:border-purple-500 transition-all text-white font-bold" placeholder="••••••••" onChange={e => setLoginData({...loginData, pass: e.target.value})} />
             </div>
-            <button className="w-full bg-purple-600 py-4 rounded-xl font-bold tracking-widest hover:shadow-[0_0_20px_#8b5cf6] transition-all uppercase text-white active:scale-95">
-              AUTHORIZE LOGIN
-            </button>
+            <button className="w-full bg-purple-600 py-4 rounded-xl font-bold tracking-widest hover:shadow-[0_0_20px_#8b5cf6] transition-all uppercase text-white active:scale-95">AUTHORIZE LOGIN</button>
           </div>
         </form>
       </div>
@@ -376,7 +316,6 @@ export default function App() {
       <ConfirmModal />
       <PromptModal />
       
-      {/* SIDEBAR NAVIGATION */}
       <div className={`${sidebarOpen ? 'w-64' : 'w-20'} transition-all bg-black/20 border-r border-white/5 flex flex-col z-20 backdrop-blur-xl shadow-[4px_0_15px_rgba(0,0,0,0.5)]`}>
         <div className="h-20 flex items-center justify-between px-6 border-b border-white/5">
           {sidebarOpen && <h1 className="text-lg font-black tracking-tighter text-purple-400">LILA STORE <span className="text-[10px] bg-purple-500/20 px-1 rounded">VVIP</span></h1>}
@@ -393,13 +332,11 @@ export default function App() {
         </nav>
         <div className="p-4 border-t border-white/5">
           <button onClick={handleLogout} className="flex items-center gap-4 text-red-400 hover:bg-red-500/10 w-full p-3 rounded-xl transition-all">
-            <LogOut size={20}/> 
-            {sidebarOpen && <span className="text-xs font-bold tracking-widest uppercase">KELUAR SISTEM</span>}
+            <LogOut size={20}/> {sidebarOpen && <span className="text-xs font-bold tracking-widest uppercase">KELUAR SISTEM</span>}
           </button>
         </div>
       </div>
 
-      {/* CORE DISPLAY */}
       <div className="flex-1 flex flex-col relative">
         <header className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-black/10 backdrop-blur-md relative z-30">
           <div className="text-[10px] font-mono text-purple-500 tracking-[0.2em] uppercase">SYSTEM CORE V5.0 SECURE</div>
@@ -411,11 +348,7 @@ export default function App() {
                 <p className="text-[9px] text-purple-400 font-mono">ID: {config.owner_id || '7475939789'}</p>
               </div>
               <div className="w-10 h-10 rounded-full border border-purple-500/50 overflow-hidden bg-purple-900/20 shadow-[0_0_10px_rgba(139,92,246,0.3)]">
-                {config.admin_photo ? (
-                  <img src={config.admin_photo} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-xs font-bold text-purple-300">PIC</div>
-                )}
+                {config.admin_photo ? <img src={config.admin_photo} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xs font-bold text-purple-300">PIC</div>}
               </div>
             </div>
 
@@ -437,16 +370,9 @@ export default function App() {
                   </div>
                   <div>
                     <label className="text-[9px] text-purple-400 font-mono tracking-widest block mb-1">NAMA TAMPILAN</label>
-                    <input 
-                      type="text" 
-                      className="w-full bg-black border border-white/10 p-2 rounded-xl text-xs text-white outline-none focus:border-purple-500" 
-                      value={config.admin_name || ''} 
-                      onChange={e => setConfig({...config, admin_name: e.target.value})} 
-                    />
+                    <input type="text" className="w-full bg-black border border-white/10 p-2 rounded-xl text-xs text-white outline-none focus:border-purple-500" value={config.admin_name || ''} onChange={e => setConfig({...config, admin_name: e.target.value})} />
                   </div>
-                  <button onClick={handleSaveSettings} className="w-full bg-purple-600 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-purple-500 transition-all text-white">
-                    SIMPAN PERUBAHAN
-                  </button>
+                  <button onClick={handleSaveSettings} className="w-full bg-purple-600 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-purple-500 transition-all text-white">SIMPAN PERUBAHAN</button>
                 </div>
               </div>
             )}
@@ -455,14 +381,11 @@ export default function App() {
 
         <main className="flex-1 overflow-y-auto p-8">
           
-          {/* TAB DASHBOARD */}
           {activeTab === 'dashboard' && (
             <div className="space-y-8 animate-in fade-in duration-500">
                <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-black tracking-tight uppercase text-white">Analitik Real-time</h2>
-                  <button onClick={() => { fetchData(); showToast('Sinkronisasi Data Berhasil', 'success'); }} className="p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-all text-purple-400">
-                    <RefreshCw size={18} className={loading?'animate-spin':''}/>
-                  </button>
+                  <button onClick={() => { fetchData(); showToast('Sinkronisasi Data Berhasil', 'success'); }} className="p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-all text-purple-400"><RefreshCw size={18} className={loading?'animate-spin':''}/></button>
                </div>
 
                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -473,9 +396,7 @@ export default function App() {
                </div>
 
                <div className="bg-white/5 border border-white/10 p-6 rounded-2xl backdrop-blur-md shadow-lg h-80">
-                  <h3 className="mb-4 font-bold text-purple-400 capitalize flex items-center gap-2">
-                    <TrendingUp size={18}/> {activeChart} Chart
-                  </h3>
+                  <h3 className="mb-4 font-bold text-purple-400 capitalize flex items-center gap-2"><TrendingUp size={18}/> {activeChart} Chart</h3>
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={trends}>
                       <defs>
@@ -493,57 +414,19 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB KONFIRMASI TOPUP */}
-          {activeTab === 'topup' && (
-            <TopupTab 
-              topups={topups} 
-              products={products} 
-              config={config} 
-              onUpdate={fetchData} 
-              showToast={showToast} 
-              showConfirm={showConfirm} 
-              showPrompt={showPrompt} 
-            />
-          )}
+          {activeTab === 'topup' && <TopupTab topups={topups} products={products} config={config} onUpdate={fetchData} showToast={showToast} showConfirm={showConfirm} showPrompt={showPrompt} />}
           
-          {/* TAB ANTREAN ORDER CEK FILE */}
-          {activeTab === 'orders' && (
-            <OrdersTab 
-              orders={orders} 
-              config={config} 
-              onUpdate={fetchData} 
-              showToast={showToast} 
-              showConfirm={showConfirm} 
-              showPrompt={showPrompt} 
-            />
-          )}
+          {activeTab === 'orders' && <OrdersTab orders={orders} config={config} onUpdate={fetchData} showToast={showToast} showConfirm={showConfirm} showPrompt={showPrompt} />}
 
-          {/* TAB DATA PELANGGAN */}
-          {activeTab === 'customers' && (
-            <CustomerTab 
-              users={users} 
-              onUpdate={fetchData} 
-              showToast={showToast} 
-              showConfirm={showConfirm} 
-              showPrompt={showPrompt} 
-            />
-          )}
+          {activeTab === 'customers' && <CustomerTab users={users} onUpdate={fetchData} showToast={showToast} showConfirm={showConfirm} showPrompt={showPrompt} />}
 
-          {/* TAB BROADCAST */}
           {activeTab === 'broadcast' && (
             <div className="max-w-3xl space-y-6 animate-in fade-in duration-300">
-              <h2 className="text-xl font-black uppercase text-white flex items-center gap-2">
-                <Megaphone className="text-purple-400"/> Pusat Broadcast
-              </h2>
+              <h2 className="text-xl font-black uppercase text-white flex items-center gap-2"><Megaphone className="text-purple-400"/> Pusat Broadcast</h2>
               <div className="bg-white/5 border border-white/10 p-8 rounded-2xl backdrop-blur-md space-y-6">
                 <div>
                   <label className="text-[10px] font-mono text-purple-400 uppercase tracking-widest block mb-2">Isi Pesan Siaran</label>
-                  <textarea 
-                    value={bcMsg} 
-                    onChange={e => setBcMsg(e.target.value)} 
-                    className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-sm text-white outline-none focus:border-purple-500 min-h-[120px]" 
-                    placeholder="Ketik pesan promosi atau pengumuman massal..." 
-                  />
+                  <textarea value={bcMsg} onChange={e => setBcMsg(e.target.value)} className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-sm text-white outline-none focus:border-purple-500 min-h-[120px]" placeholder="Ketik pesan promosi atau pengumuman massal..." />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
@@ -562,22 +445,16 @@ export default function App() {
                     </div>
                   )}
                 </div>
-                <button onClick={sendBroadcast} className="w-full bg-purple-600 py-4 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-purple-500 text-white shadow-lg transition-all active:scale-95">
-                  KIRIM BROADCAST SEKARANG
-                </button>
+                <button onClick={sendBroadcast} className="w-full bg-purple-600 py-4 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-purple-500 text-white shadow-lg transition-all active:scale-95">KIRIM BROADCAST SEKARANG</button>
               </div>
             </div>
           )}
 
-          {/* TAB SETTING PRODUK */}
           {activeTab === 'products' && (
             <div className="space-y-8 animate-in fade-in duration-300">
-               <h2 className="text-xl font-black uppercase text-white flex items-center gap-2">
-                 <Package className="text-purple-400"/> Manajemen Produk
-               </h2>
+               <h2 className="text-xl font-black uppercase text-white flex items-center gap-2"><Package className="text-purple-400"/> Manajemen Produk</h2>
                
                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* FORM INPUT PRODUK */}
                   <div className="bg-white/5 border border-white/10 p-6 rounded-2xl backdrop-blur-md h-fit">
                      <h3 className="text-sm font-mono text-purple-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                        <Plus size={16}/> {productForm.id ? 'Edit Produk' : 'Tambah Produk Baru'}
@@ -609,14 +486,11 @@ export default function App() {
                            {productForm.id && (
                              <button type="button" onClick={() => setProductForm({ id: null, name: '', description: '', price: '', quota_turnitin: '', quota_ai: '' })} className="flex-1 bg-white/5 border border-white/10 py-3 rounded-xl text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-white">Batal</button>
                            )}
-                           <button type="submit" className="flex-1 bg-purple-600 hover:bg-purple-500 py-3 rounded-xl text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-purple-600/20">
-                             <Save size={14} className="inline mr-2"/>Simpan
-                           </button>
+                           <button type="submit" className="flex-1 bg-purple-600 hover:bg-purple-500 py-3 rounded-xl text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-purple-600/20"><Save size={14} className="inline mr-2"/>Simpan</button>
                         </div>
                      </form>
                   </div>
 
-                  {/* LIST PRODUK DARI DATABASE */}
                   <div className="lg:col-span-2 bg-white/5 border border-white/10 p-6 rounded-2xl backdrop-blur-md">
                      <h3 className="text-sm font-mono text-purple-400 uppercase tracking-widest mb-4">Daftar Paket Aktif</h3>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -642,7 +516,6 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB PENGATURAN */}
           {activeTab === 'settings' && (
             <div className="max-w-3xl space-y-8 pb-20 animate-in fade-in duration-300">
                <h2 className="text-xl font-black uppercase text-white">Pengaturan Bot & Mainframe</h2>
@@ -702,9 +575,7 @@ export default function App() {
                   </div>
                   <input type="checkbox" checked={config.maintenance_mode || false} onChange={e => setConfig({...config, maintenance_mode: e.target.checked})} className="w-5 h-5 rounded border-white/10 text-red-600 focus:ring-0" />
                </div>
-               <button onClick={handleSaveSettings} className="w-full bg-purple-600 py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-purple-500 transition-all text-white shadow-xl flex items-center justify-center gap-2">
-                 <Save size={16}/> SIMPAN SEMUA PENGATURAN
-               </button>
+               <button onClick={handleSaveSettings} className="w-full bg-purple-600 py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-purple-500 transition-all text-white shadow-xl flex items-center justify-center gap-2"><Save size={16}/> SIMPAN SEMUA PENGATURAN</button>
             </div>
           )}
         </main>
@@ -733,7 +604,6 @@ function NavItem({ icon, label, active, onClick, open }) {
   );
 }
 
-// COMPONENT: TOPUP TAB 
 function TopupTab({ topups, products, config, onUpdate, showToast, showConfirm, showPrompt }) {
   const [previewImg, setPreviewImg] = useState(null);
 
@@ -845,12 +715,8 @@ function TopupTab({ topups, products, config, onUpdate, showToast, showConfirm, 
                </div>
                
                <div className="flex gap-3 w-full md:w-auto">
-                  <button onClick={() => handleAction(t.id, 'SUCCESS', t.telegram_id, t.package_name)} className="flex-1 md:flex-none bg-green-600/20 text-green-400 border border-green-500/30 px-6 py-3 rounded-xl text-xs font-black uppercase hover:bg-green-600 hover:text-white transition-all shadow-[0_0_15px_rgba(34,197,94,0.1)]">
-                    <Check size={16} className="inline mr-2"/> Terima
-                  </button>
-                  <button onClick={() => handleAction(t.id, 'REJECTED', t.telegram_id, t.package_name)} className="flex-1 md:flex-none bg-red-600/20 text-red-400 border border-red-500/30 px-6 py-3 rounded-xl text-xs font-black uppercase hover:bg-red-600 hover:text-white transition-all shadow-[0_0_15px_rgba(239,68,68,0.1)]">
-                    <X size={16} className="inline mr-2"/> Tolak
-                  </button>
+                  <button onClick={() => handleAction(t.id, 'SUCCESS', t.telegram_id, t.package_name)} className="flex-1 md:flex-none bg-green-600/20 text-green-400 border border-green-500/30 px-6 py-3 rounded-xl text-xs font-black uppercase hover:bg-green-600 hover:text-white transition-all shadow-[0_0_15px_rgba(34,197,94,0.1)]"><Check size={16} className="inline mr-2"/> Terima</button>
+                  <button onClick={() => handleAction(t.id, 'REJECTED', t.telegram_id, t.package_name)} className="flex-1 md:flex-none bg-red-600/20 text-red-400 border border-red-500/30 px-6 py-3 rounded-xl text-xs font-black uppercase hover:bg-red-600 hover:text-white transition-all shadow-[0_0_15px_rgba(239,68,68,0.1)]"><X size={16} className="inline mr-2"/> Tolak</button>
                </div>
             </div>
           ))}
@@ -868,7 +734,6 @@ function TopupTab({ topups, products, config, onUpdate, showToast, showConfirm, 
   );
 }
 
-// COMPONENT: ANTREAN ORDER SERVIS (CEK FILE)
 function OrdersTab({ orders, config, onUpdate, showToast, showConfirm, showPrompt }) {
   const fileInputRef = useRef(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -904,13 +769,13 @@ function OrdersTab({ orders, config, onUpdate, showToast, showConfirm, showPromp
       showConfirm(`Tolak dan kembalikan kuota user?`, async () => {
          const key = order.service_type === 'Turnitin' ? 'quota_turnitin' : 'quota_ai';
          const { data: user } = await supabase.from('users').select(key).eq('telegram_id', order.telegram_id).single();
-         if (user) {
+         if(user) {
            await supabase.from('users').update({ [key]: user[key] + 1 }).eq('telegram_id', order.telegram_id);
          }
 
          await supabase.from('orders').update({ status: 'REJECTED', reject_reason: reason }).eq('id', order.id);
          
-         if (config.bot_token) {
+         if(config.bot_token) {
             await fetch(`https://api.telegram.org/bot${config.bot_token}/sendMessage`, { 
               method: 'POST', 
               headers: { 'Content-Type': 'application/json' }, 
@@ -947,15 +812,9 @@ function OrdersTab({ orders, config, onUpdate, showToast, showConfirm, showPromp
                   <p className="text-[10px] text-gray-500 mt-2">ID User: {o.telegram_id}</p>
                </div>
                <div className="flex flex-col gap-2">
-                  <a href={o.file_url} target="_blank" rel="noreferrer" className="text-center bg-blue-600/20 text-blue-400 border border-blue-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition-all">
-                    <Download size={14} className="inline mr-1"/> Download File User
-                  </a>
-                  <button onClick={() => { setSelectedOrder(o); fileInputRef.current.click(); }} className="bg-green-600/20 text-green-400 border border-green-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-green-600 hover:text-white transition-all">
-                    <Upload size={14} className="inline mr-1"/> Kirim Hasil Cek (PDF/Doc)
-                  </button>
-                  <button onClick={() => handleReject(o)} className="bg-red-600/20 text-red-400 border border-red-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition-all">
-                    <X size={14} className="inline mr-1"/> Tolak & Refund Kuota
-                  </button>
+                  <a href={o.file_url} target="_blank" rel="noreferrer" className="text-center bg-blue-600/20 text-blue-400 border border-blue-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition-all"><Download size={14} className="inline mr-1"/> Download File User</a>
+                  <button onClick={() => { setSelectedOrder(o); fileInputRef.current.click(); }} className="bg-green-600/20 text-green-400 border border-green-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-green-600 hover:text-white transition-all"><Upload size={14} className="inline mr-1"/> Kirim Hasil Cek (PDF/Doc)</button>
+                  <button onClick={() => handleReject(o)} className="bg-red-600/20 text-red-400 border border-red-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition-all"><X size={14} className="inline mr-1"/> Tolak & Refund Kuota</button>
                </div>
             </div>
           ))}
