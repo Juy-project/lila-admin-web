@@ -38,7 +38,6 @@ export default function App() {
   // Form State Produk
   const [productForm, setProductForm] = useState({ id: null, name: '', description: '', price: '', quota_turnitin: '', quota_ai: '' });
 
-  // --- FUNGSI ALAT BANTU ---
   const showToast = (msg, type = 'success') => {
     setToast({ show: true, msg, type });
     setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 3000);
@@ -61,7 +60,7 @@ export default function App() {
     setInputDialog({ show: false, title: '', placeholder: '', type: 'text', onSubmit: null });
   };
 
-  // --- API PENGIRIMAN TELEGRAM TERPUSAT (ANTI GAGAL) ---
+  // --- API PENGIRIMAN TELEGRAM TERPUSAT ---
   const sendTgMessage = async (chatId, text) => {
     if (!config.bot_token) return;
     try {
@@ -85,7 +84,7 @@ export default function App() {
     } catch(e) { console.log('Telegram API Error:', e); }
   };
 
-  // --- SISTEM FINGERPRINT (IP & DEVICE LOGIC) ---
+  // --- SISTEM FINGERPRINT ---
   const checkSession = async () => {
     try {
       const savedSession = JSON.parse(localStorage.getItem('lila_sec_protocol'));
@@ -210,16 +209,13 @@ export default function App() {
     }
   };
 
-  // --- SISTEM BROADCAST NYATA ---
   const handleSendBroadcast = async () => {
     if (!bcMsg) return showToast('Isi pesan broadcast terlebih dahulu!', 'error');
     if (!config.bot_token) return showToast('Token Bot belum diisi di Pengaturan!', 'error');
 
     showConfirm(`Kirim broadcast ke ${users.length} pengguna aktif sekarang?`, async () => {
       showToast(`PROSES BROADCAST DIMULAI... Mohon tunggu.`, 'success');
-      
       let successCount = 0;
-      
       for (const u of users) {
         try {
           if (bcImg) {
@@ -227,12 +223,9 @@ export default function App() {
              formData.append('chat_id', String(u.telegram_id));
              formData.append('caption', bcMsg);
              formData.append('parse_mode', 'Markdown');
-             
-             // Convert base64 image dari web ke Blob format
              const res = await fetch(bcImg);
              const blob = await res.blob();
              formData.append('photo', blob, 'broadcast.jpg');
-
              await fetch(`https://api.telegram.org/bot${config.bot_token}/sendPhoto`, { method: 'POST', body: formData });
           } else {
              await fetch(`https://api.telegram.org/bot${config.bot_token}/sendMessage`, {
@@ -242,15 +235,13 @@ export default function App() {
              });
           }
           successCount++;
-        } catch(e) { console.log('Gagal kirim ke', u.telegram_id); }
+        } catch(e) {}
       }
-
       showToast(`BROADCAST SELESAI! Terkirim ke ${successCount} user.`, 'success');
       setBcMsg(''); setBcImg('');
     });
   };
 
-  // --- MANAJEMEN CRUD PRODUK ---
   const handleSaveProduct = async (e) => {
     e.preventDefault();
     if (!productForm.name || !productForm.price) return showToast('Nama & Harga wajib diisi!', 'error');
@@ -282,14 +273,9 @@ export default function App() {
     });
   };
 
-  // ==============================================================
-  // RENDER TAMPILAN JIKA BELUM LOGIN
-  // ==============================================================
   if (!isLoggedIn) {
     return (
       <div className="h-screen w-full flex items-center justify-center font-mono p-4 overflow-hidden relative bg-[#050505]">
-        
-        {/* Render Toast Modal Langsung di sini */}
         {toast.show && (
           <div className="fixed top-8 right-8 z-[100] animate-in slide-in-from-right fade-in duration-300">
             <div className={`flex items-center gap-3 px-6 py-4 rounded-xl backdrop-blur-xl border ${toast.type === 'error' ? 'bg-red-950/80 border-red-500/50 text-red-100 shadow-[0_0_20px_rgba(239,68,68,0.3)]' : 'bg-purple-900/80 border-purple-500/50 text-purple-100 shadow-[0_0_20px_rgba(168,85,247,0.3)]'}`}>
@@ -298,7 +284,6 @@ export default function App() {
             </div>
           </div>
         )}
-
         <div className="absolute w-96 h-96 bg-purple-600/10 blur-[120px] rounded-full top-0 left-0"></div>
         <form onSubmit={handleLogin} className="w-full max-w-md bg-black/40 border border-purple-500/30 p-8 rounded-2xl backdrop-blur-xl z-10 relative shadow-2xl">
           <h1 className="text-2xl font-black text-center mb-8 tracking-[0.3em] uppercase text-purple-400 drop-shadow-[0_0_8px_rgba(139,92,246,0.4)]">LILA ACCESS</h1>
@@ -318,14 +303,10 @@ export default function App() {
     );
   }
 
-  // ==============================================================
-  // RENDER TAMPILAN UTAMA WEB ADMIN
-  // ==============================================================
   return (
     <div className="flex h-screen bg-transparent font-sans text-gray-100 overflow-hidden relative">
       
-      {/* ---------------- MODAL & NOTIFIKASI RENDER INLINE ---------------- */}
-      {/* Toast Notification */}
+      {/* ---------------- MODAL INLINE ---------------- */}
       {toast.show && (
         <div className="fixed top-8 right-8 z-[100] animate-in slide-in-from-right fade-in duration-300">
           <div className={`flex items-center gap-3 px-6 py-4 rounded-xl backdrop-blur-xl border ${toast.type === 'error' ? 'bg-red-950/80 border-red-500/50 text-red-100 shadow-[0_0_20px_rgba(239,68,68,0.3)]' : 'bg-purple-900/80 border-purple-500/50 text-purple-100 shadow-[0_0_20px_rgba(168,85,247,0.3)]'}`}>
@@ -335,14 +316,11 @@ export default function App() {
         </div>
       )}
 
-      {/* Confirmation Modal */}
       {dialog.show && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-[#0a0a0f] border border-purple-500/30 p-8 rounded-2xl shadow-[0_0_40px_rgba(139,92,246,0.2)] max-w-sm w-full mx-4 animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-center mb-6">
-              <div className="w-16 h-16 bg-purple-500/10 rounded-full flex items-center justify-center border border-purple-500/30">
-                <Info size={32} className="text-purple-400" />
-              </div>
+              <div className="w-16 h-16 bg-purple-500/10 rounded-full flex items-center justify-center border border-purple-500/30"><Info size={32} className="text-purple-400" /></div>
             </div>
             <p className="text-center text-white font-bold mb-8">{dialog.msg}</p>
             <div className="flex gap-4">
@@ -353,31 +331,15 @@ export default function App() {
         </div>
       )}
 
-      {/* Prompt Modal (Input Text/Textarea yang Fix Fokusnya) */}
       {inputDialog.show && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-[#0a0a0f] border border-purple-500/30 p-8 rounded-2xl shadow-[0_0_40px_rgba(139,92,246,0.2)] max-w-xl w-full mx-4 animate-in zoom-in-95 duration-200">
             <h3 className="text-center text-purple-400 font-black tracking-widest uppercase mb-6">{inputDialog.title}</h3>
-            
             {inputDialog.type === 'textarea' ? (
-              <textarea 
-                autoFocus
-                className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-sm text-white outline-none focus:border-purple-500 mb-6 font-mono min-h-[150px]" 
-                placeholder={inputDialog.placeholder}
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-              />
+              <textarea autoFocus className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-sm text-white outline-none focus:border-purple-500 mb-6 font-mono min-h-[150px]" placeholder={inputDialog.placeholder} value={inputValue} onChange={(e) => setInputValue(e.target.value)} />
             ) : (
-              <input 
-                type={inputDialog.type} 
-                autoFocus
-                className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-sm text-white outline-none focus:border-purple-500 mb-6 font-mono" 
-                placeholder={inputDialog.placeholder}
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-              />
+              <input type={inputDialog.type} autoFocus className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-sm text-white outline-none focus:border-purple-500 mb-6 font-mono" placeholder={inputDialog.placeholder} value={inputValue} onChange={(e) => setInputValue(e.target.value)} />
             )}
-
             <div className="flex gap-4">
               <button onClick={closePrompt} className="flex-1 py-3 rounded-xl border border-white/10 text-gray-400 hover:bg-white/5 hover:text-white transition-all font-bold text-xs uppercase tracking-widest">Batal</button>
               <button onClick={() => { inputDialog.onSubmit(inputValue); closePrompt(); }} className="flex-1 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white transition-all font-bold text-xs uppercase tracking-widest shadow-[0_0_15px_rgba(139,92,246,0.4)]">Kirim</button>
@@ -385,8 +347,6 @@ export default function App() {
           </div>
         </div>
       )}
-      {/* ---------------------------------------------------------------- */}
-
 
       {/* SIDEBAR NAVIGATION */}
       <div className={`${sidebarOpen ? 'w-64' : 'w-20'} transition-all bg-black/20 border-r border-white/5 flex flex-col z-20 backdrop-blur-xl shadow-[4px_0_15px_rgba(0,0,0,0.5)]`}>
@@ -410,11 +370,9 @@ export default function App() {
         </div>
       </div>
 
-      {/* CORE DISPLAY */}
       <div className="flex-1 flex flex-col relative">
         <header className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-black/10 backdrop-blur-md relative z-30">
           <div className="text-[10px] font-mono text-purple-500 tracking-[0.2em] uppercase">SYSTEM CORE V5.0 SECURE</div>
-          
           <div className="relative">
             <div onClick={() => setShowProfileModal(!showProfileModal)} className="flex items-center gap-4 cursor-pointer hover:bg-white/5 p-2 rounded-xl transition-all">
               <div className="text-right">
@@ -455,7 +413,6 @@ export default function App() {
 
         <main className="flex-1 overflow-y-auto p-8">
           
-          {/* TAB DASHBOARD */}
           {activeTab === 'dashboard' && (
             <div className="space-y-8 animate-in fade-in duration-500">
                <div className="flex items-center justify-between">
@@ -489,7 +446,6 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB KONFIRMASI TOPUP */}
           {activeTab === 'topup' && (
             <TopupTab 
               topups={topups} 
@@ -499,11 +455,9 @@ export default function App() {
               showConfirm={showConfirm} 
               showPrompt={showPrompt} 
               sendTgMessage={sendTgMessage}
-              sendTgDocument={sendTgDocument}
             />
           )}
           
-          {/* TAB ANTREAN ORDER CEK FILE */}
           {activeTab === 'orders' && (
             <OrdersTab 
               orders={orders} 
@@ -516,7 +470,6 @@ export default function App() {
             />
           )}
 
-          {/* TAB DATA PELANGGAN */}
           {activeTab === 'customers' && (
             <CustomerTab 
               users={users} 
@@ -527,7 +480,6 @@ export default function App() {
             />
           )}
 
-          {/* TAB BROADCAST */}
           {activeTab === 'broadcast' && (
             <div className="max-w-3xl space-y-6 animate-in fade-in duration-300">
               <h2 className="text-xl font-black uppercase text-white flex items-center gap-2"><Megaphone className="text-purple-400"/> Pusat Broadcast</h2>
@@ -558,13 +510,11 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB SETTING PRODUK */}
           {activeTab === 'products' && (
             <div className="space-y-8 animate-in fade-in duration-300">
                <h2 className="text-xl font-black uppercase text-white flex items-center gap-2"><Package className="text-purple-400"/> Manajemen Produk</h2>
                
                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* FORM INPUT PRODUK */}
                   <div className="bg-white/5 border border-white/10 p-6 rounded-2xl backdrop-blur-md h-fit">
                      <h3 className="text-sm font-mono text-purple-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                        <Plus size={16}/> {productForm.id ? 'Edit Produk' : 'Tambah Produk Baru'}
@@ -601,7 +551,6 @@ export default function App() {
                      </form>
                   </div>
 
-                  {/* LIST PRODUK DARI DATABASE */}
                   <div className="lg:col-span-2 bg-white/5 border border-white/10 p-6 rounded-2xl backdrop-blur-md">
                      <h3 className="text-sm font-mono text-purple-400 uppercase tracking-widest mb-4">Daftar Paket Aktif</h3>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -696,9 +645,6 @@ export default function App() {
   );
 }
 
-// -------------------------------------------------------------
-// KOMPONEN PELENGKAP (TIDAK ADA YANG DIPOTONG/DIRINGKAS)
-// -------------------------------------------------------------
 function StatCard({ title, val, color, onClick }) {
   return (
     <div onClick={onClick} className={`bg-white/5 border border-white/10 rounded-2xl p-6 relative overflow-hidden group hover:border-white/20 transition-all backdrop-blur-md shadow-lg border-l-4 ${color} cursor-pointer`}>
@@ -719,8 +665,8 @@ function NavItem({ icon, label, active, onClick, open }) {
   );
 }
 
-// COMPONENT: TOPUP TAB 
-function TopupTab({ topups, products, onUpdate, showToast, showConfirm, showPrompt, sendTgMessage, sendTgDocument }) {
+// COMPONENT: TOPUP TAB (TIDAK MINTA PRODUK, HANYA NAMBAH KUOTA & NOTIF)
+function TopupTab({ topups, products, onUpdate, showToast, showConfirm, showPrompt, sendTgMessage }) {
   const [previewImg, setPreviewImg] = useState(null);
 
   const handleAction = (id, status, telegram_id, package_name) => {
@@ -732,44 +678,37 @@ function TopupTab({ topups, products, onUpdate, showToast, showConfirm, showProm
           if (error) {
             showToast(error.message, 'error');
           } else {
-            await sendTgMessage(telegram_id, `❌ *PEMBAYARAN DITOLAK*\n\nPaket: ${package_name}\nAlasan: ${reason}\n\nSilakan hubungi admin jika ada kendala.`);
+            // NOTIFIKASI TOLAK SESUAI PERMINTAAN USER
+            await sendTgMessage(telegram_id, `❌ *PEMBAYARAN DITOLAK*\n\n📦 Paket: ${package_name}\n📝 Alasan: ${reason}\n\nSilakan perbaiki dan coba top up kembali, atau hubungi admin jika ada kendala.`);
             showToast('Transaksi ditolak dan notifikasi terkirim.', 'success'); 
             onUpdate(); 
           }
         });
       });
     } else if (status === 'SUCCESS') {
-      showPrompt("Kirim Produk (Optional)", "Masukkan script/link produk yang akan dibuat jadi file .txt (Kosongkan jika hanya topup kuota)", "textarea", async (productText) => {
-        showConfirm(`Terima transaksi ini? Kuota akan ditambah dan produk (jika diisi) akan dikirim.`, async () => {
-          
-          const matchProd = products.find(p => p.name === package_name);
-          const addTurnitin = matchProd ? matchProd.quota_turnitin : 0;
-          const addAi = matchProd ? matchProd.quota_ai : 0;
+      showConfirm(`Terima transaksi ini? Kuota akan otomatis bertambah ke akun user.`, async () => {
+        const matchProd = products.find(p => p.name === package_name);
+        const addTurnitin = matchProd ? matchProd.quota_turnitin : 0;
+        const addAi = matchProd ? matchProd.quota_ai : 0;
 
-          const { data: user } = await supabase.from('users').select('quota_turnitin, quota_ai').eq('telegram_id', telegram_id).single();
-          
-          if (user) {
-            const newTurnitin = (user.quota_turnitin || 0) + addTurnitin;
-            const newAi = (user.quota_ai || 0) + addAi;
-            await supabase.from('users').update({ quota_turnitin: newTurnitin, quota_ai: newAi }).eq('telegram_id', telegram_id);
-          }
+        const { data: user } = await supabase.from('users').select('quota_turnitin, quota_ai').eq('telegram_id', telegram_id).single();
+        
+        if (user) {
+          const newTurnitin = (user.quota_turnitin || 0) + addTurnitin;
+          const newAi = (user.quota_ai || 0) + addAi;
+          await supabase.from('users').update({ quota_turnitin: newTurnitin, quota_ai: newAi }).eq('telegram_id', telegram_id);
+        }
 
-          const { error } = await supabase.from('topups').update({ status }).eq('id', id);
-          
-          if (error) {
-            showToast(error.message, 'error');
-          } else {
-            if (productText && productText.trim() !== '') {
-              const blob = new Blob([productText], { type: 'text/plain' });
-              const fileName = `${package_name.replace(/\s+/g, '_')}_LilaStore.txt`;
-              await sendTgDocument(telegram_id, `✅ *PEMBAYARAN BERHASIL*\n\nPaket: ${package_name}\n\nTerima kasih telah berbelanja di Lila Store! Pesananmu ada di file terlampir di bawah ini 💜`, blob, fileName);
-            } else {
-              await sendTgMessage(telegram_id, `✅ *PEMBAYARAN BERHASIL*\n\nPaket: ${package_name}\n\nKuota kamu sudah otomatis ditambahkan. Terima kasih telah berbelanja di Lila Store! 💜`);
-            }
-            showToast('Transaksi diterima & Produk terkirim!', 'success'); 
-            onUpdate(); 
-          }
-        });
+        const { error } = await supabase.from('topups').update({ status }).eq('id', id);
+        
+        if (error) {
+          showToast(error.message, 'error');
+        } else {
+          // NOTIFIKASI TERIMA (HANYA KUOTA, BUKAN AKUN)
+          await sendTgMessage(telegram_id, `✅ *PEMBAYARAN BERHASIL*\n\n📦 *Paket:* ${package_name}\n\nPembayaran kamu telah diterima. Kuota kamu sudah otomatis ditambahkan. Silakan cek di menu *Akun Saya* 💜`);
+          showToast('Top Up diterima & Kuota bertambah!', 'success'); 
+          onUpdate(); 
+        }
       });
     }
   };
@@ -800,6 +739,7 @@ function TopupTab({ topups, products, onUpdate, showToast, showConfirm, showProm
                  <div>
                    <p className="font-bold text-white text-lg">{t.package_name || 'Paket'}</p>
                    <p className="text-xs font-mono text-purple-300 mb-1">ID: {t.telegram_id}</p>
+                   {/* PERBAIKAN HARGA 0: Nanti bot akan menyimpan harga yang benar ke Supabase */}
                    <p className="text-sm font-bold text-green-400">Rp {(t.amount || 0).toLocaleString()}</p>
                  </div>
                </div>
