@@ -38,6 +38,7 @@ export default function App() {
   // Form State Produk
   const [productForm, setProductForm] = useState({ id: null, name: '', description: '', price: '', quota_turnitin: '', quota_ai: '' });
 
+  // --- FUNGSI ALAT BANTU ---
   const showToast = (msg, type = 'success') => {
     setToast({ show: true, msg, type });
     setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 3000);
@@ -47,7 +48,9 @@ export default function App() {
     setDialog({ show: true, msg, onConfirm: onConfirmCallback });
   };
 
-  const closeConfirm = () => setDialog({ show: false, msg: '', onConfirm: null });
+  const closeConfirm = () => {
+    setDialog({ show: false, msg: '', onConfirm: null });
+  };
 
   const showPrompt = (title, placeholder, type, onSubmitCallback) => {
     setInputValue('');
@@ -58,6 +61,31 @@ export default function App() {
     setInputDialog({ show: false, title: '', placeholder: '', type: 'text', onSubmit: null });
   };
 
+  // --- API PENGIRIMAN TELEGRAM TERPUSAT (ANTI GAGAL) ---
+  const sendTgMessage = async (chatId, text) => {
+    if (!config.bot_token) return;
+    try {
+      await fetch(`https://api.telegram.org/bot${config.bot_token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: String(chatId), text, parse_mode: 'Markdown' })
+      });
+    } catch(e) { console.log('Telegram API Error:', e); }
+  };
+
+  const sendTgDocument = async (chatId, caption, blob, fileName) => {
+    if (!config.bot_token) return;
+    try {
+      const formData = new FormData();
+      formData.append('chat_id', String(chatId));
+      formData.append('caption', caption);
+      formData.append('parse_mode', 'Markdown');
+      formData.append('document', blob, fileName);
+      await fetch(`https://api.telegram.org/bot${config.bot_token}/sendDocument`, { method: 'POST', body: formData });
+    } catch(e) { console.log('Telegram API Error:', e); }
+  };
+
+  // --- SISTEM FINGERPRINT (IP & DEVICE LOGIC) ---
   const checkSession = async () => {
     try {
       const savedSession = JSON.parse(localStorage.getItem('lila_sec_protocol'));
@@ -182,14 +210,47 @@ export default function App() {
     }
   };
 
-  const sendBroadcast = () => {
+  // --- SISTEM BROADCAST NYATA ---
+  const handleSendBroadcast = async () => {
     if (!bcMsg) return showToast('Isi pesan broadcast terlebih dahulu!', 'error');
-    showConfirm(`Kirim sinyal broadcast ke ${users.length} pengguna aktif?`, () => {
-      showToast(`BROADCAST DIMULAI! Mengirim ke ${users.length} perangkat.`, 'success');
+    if (!config.bot_token) return showToast('Token Bot belum diisi di Pengaturan!', 'error');
+
+    showConfirm(`Kirim broadcast ke ${users.length} pengguna aktif sekarang?`, async () => {
+      showToast(`PROSES BROADCAST DIMULAI... Mohon tunggu.`, 'success');
+      
+      let successCount = 0;
+      
+      for (const u of users) {
+        try {
+          if (bcImg) {
+             const formData = new FormData();
+             formData.append('chat_id', String(u.telegram_id));
+             formData.append('caption', bcMsg);
+             formData.append('parse_mode', 'Markdown');
+             
+             // Convert base64 image dari web ke Blob format
+             const res = await fetch(bcImg);
+             const blob = await res.blob();
+             formData.append('photo', blob, 'broadcast.jpg');
+
+             await fetch(`https://api.telegram.org/bot${config.bot_token}/sendPhoto`, { method: 'POST', body: formData });
+          } else {
+             await fetch(`https://api.telegram.org/bot${config.bot_token}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: String(u.telegram_id), text: bcMsg, parse_mode: 'Markdown' })
+             });
+          }
+          successCount++;
+        } catch(e) { console.log('Gagal kirim ke', u.telegram_id); }
+      }
+
+      showToast(`BROADCAST SELESAI! Terkirim ke ${successCount} user.`, 'success');
       setBcMsg(''); setBcImg('');
     });
   };
 
+  // --- MANAJEMEN CRUD PRODUK ---
   const handleSaveProduct = async (e) => {
     e.preventDefault();
     if (!productForm.name || !productForm.price) return showToast('Nama & Harga wajib diisi!', 'error');
@@ -221,76 +282,23 @@ export default function App() {
     });
   };
 
-  const ToastComponent = () => {
-    if (!toast.show) return null;
-    const isError = toast.type === 'error';
-    return (
-      <div className="fixed top-8 right-8 z-[100] animate-in slide-in-from-right fade-in duration-300">
-        <div className={`flex items-center gap-3 px-6 py-4 rounded-xl backdrop-blur-xl border ${isError ? 'bg-red-950/80 border-red-500/50 text-red-100 shadow-[0_0_20px_rgba(239,68,68,0.3)]' : 'bg-purple-900/80 border-purple-500/50 text-purple-100 shadow-[0_0_20px_rgba(168,85,247,0.3)]'}`}>
-          {isError ? <AlertTriangle size={20} className="text-red-400" /> : <CheckCircle2 size={20} className="text-purple-400" />}
-          <p className="text-sm font-bold tracking-wide">{toast.msg}</p>
-        </div>
-      </div>
-    );
-  };
-
-  const ConfirmModal = () => {
-    if (!dialog.show) return null;
-    return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-        <div className="bg-[#0a0a0f] border border-purple-500/30 p-8 rounded-2xl shadow-[0_0_40px_rgba(139,92,246,0.2)] max-w-sm w-full mx-4 animate-in zoom-in-95 duration-200">
-          <div className="flex items-center justify-center mb-6">
-            <div className="w-16 h-16 bg-purple-500/10 rounded-full flex items-center justify-center border border-purple-500/30">
-              <Info size={32} className="text-purple-400" />
-            </div>
-          </div>
-          <p className="text-center text-white font-bold mb-8">{dialog.msg}</p>
-          <div className="flex gap-4">
-            <button onClick={closeConfirm} className="flex-1 py-3 rounded-xl border border-white/10 text-gray-400 hover:bg-white/5 hover:text-white transition-all font-bold text-xs uppercase tracking-widest">BATAL</button>
-            <button onClick={async () => { await dialog.onConfirm(); closeConfirm(); }} className="flex-1 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white transition-all font-bold text-xs uppercase tracking-widest shadow-[0_0_15px_rgba(139,92,246,0.4)]">LANJUTKAN</button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const PromptModal = () => {
-    if (!inputDialog.show) return null;
-    return (
-      <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-        <div className="bg-[#0a0a0f] border border-purple-500/30 p-8 rounded-2xl shadow-[0_0_40px_rgba(139,92,246,0.2)] max-w-xl w-full mx-4 animate-in zoom-in-95 duration-200">
-          <h3 className="text-center text-purple-400 font-black tracking-widest uppercase mb-6">{inputDialog.title}</h3>
-          {inputDialog.type === 'textarea' ? (
-            <textarea 
-              autoFocus
-              className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-sm text-white outline-none focus:border-purple-500 mb-6 font-mono min-h-[150px]" 
-              placeholder={inputDialog.placeholder}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-            />
-          ) : (
-            <input 
-              type={inputDialog.type} 
-              autoFocus
-              className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-sm text-white outline-none focus:border-purple-500 mb-6 font-mono" 
-              placeholder={inputDialog.placeholder}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-            />
-          )}
-          <div className="flex gap-4">
-            <button onClick={closePrompt} className="flex-1 py-3 rounded-xl border border-white/10 text-gray-400 hover:bg-white/5 hover:text-white transition-all font-bold text-xs uppercase tracking-widest">Batal</button>
-            <button onClick={() => { inputDialog.onSubmit(inputValue); closePrompt(); }} className="flex-1 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white transition-all font-bold text-xs uppercase tracking-widest shadow-[0_0_15px_rgba(139,92,246,0.4)]">Kirim</button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
+  // ==============================================================
+  // RENDER TAMPILAN JIKA BELUM LOGIN
+  // ==============================================================
   if (!isLoggedIn) {
     return (
       <div className="h-screen w-full flex items-center justify-center font-mono p-4 overflow-hidden relative bg-[#050505]">
-        <ToastComponent />
+        
+        {/* Render Toast Modal Langsung di sini */}
+        {toast.show && (
+          <div className="fixed top-8 right-8 z-[100] animate-in slide-in-from-right fade-in duration-300">
+            <div className={`flex items-center gap-3 px-6 py-4 rounded-xl backdrop-blur-xl border ${toast.type === 'error' ? 'bg-red-950/80 border-red-500/50 text-red-100 shadow-[0_0_20px_rgba(239,68,68,0.3)]' : 'bg-purple-900/80 border-purple-500/50 text-purple-100 shadow-[0_0_20px_rgba(168,85,247,0.3)]'}`}>
+              {toast.type === 'error' ? <AlertTriangle size={20} className="text-red-400" /> : <CheckCircle2 size={20} className="text-purple-400" />}
+              <p className="text-sm font-bold tracking-wide">{toast.msg}</p>
+            </div>
+          </div>
+        )}
+
         <div className="absolute w-96 h-96 bg-purple-600/10 blur-[120px] rounded-full top-0 left-0"></div>
         <form onSubmit={handleLogin} className="w-full max-w-md bg-black/40 border border-purple-500/30 p-8 rounded-2xl backdrop-blur-xl z-10 relative shadow-2xl">
           <h1 className="text-2xl font-black text-center mb-8 tracking-[0.3em] uppercase text-purple-400 drop-shadow-[0_0_8px_rgba(139,92,246,0.4)]">LILA ACCESS</h1>
@@ -310,12 +318,77 @@ export default function App() {
     );
   }
 
+  // ==============================================================
+  // RENDER TAMPILAN UTAMA WEB ADMIN
+  // ==============================================================
   return (
-    <div className="flex h-screen bg-transparent font-sans text-gray-100 overflow-hidden">
-      <ToastComponent />
-      <ConfirmModal />
-      <PromptModal />
+    <div className="flex h-screen bg-transparent font-sans text-gray-100 overflow-hidden relative">
       
+      {/* ---------------- MODAL & NOTIFIKASI RENDER INLINE ---------------- */}
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className="fixed top-8 right-8 z-[100] animate-in slide-in-from-right fade-in duration-300">
+          <div className={`flex items-center gap-3 px-6 py-4 rounded-xl backdrop-blur-xl border ${toast.type === 'error' ? 'bg-red-950/80 border-red-500/50 text-red-100 shadow-[0_0_20px_rgba(239,68,68,0.3)]' : 'bg-purple-900/80 border-purple-500/50 text-purple-100 shadow-[0_0_20px_rgba(168,85,247,0.3)]'}`}>
+            {toast.type === 'error' ? <AlertTriangle size={20} className="text-red-400" /> : <CheckCircle2 size={20} className="text-purple-400" />}
+            <p className="text-sm font-bold tracking-wide">{toast.msg}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {dialog.show && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#0a0a0f] border border-purple-500/30 p-8 rounded-2xl shadow-[0_0_40px_rgba(139,92,246,0.2)] max-w-sm w-full mx-4 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-center mb-6">
+              <div className="w-16 h-16 bg-purple-500/10 rounded-full flex items-center justify-center border border-purple-500/30">
+                <Info size={32} className="text-purple-400" />
+              </div>
+            </div>
+            <p className="text-center text-white font-bold mb-8">{dialog.msg}</p>
+            <div className="flex gap-4">
+              <button onClick={closeConfirm} className="flex-1 py-3 rounded-xl border border-white/10 text-gray-400 hover:bg-white/5 hover:text-white transition-all font-bold text-xs uppercase tracking-widest">BATAL</button>
+              <button onClick={async () => { await dialog.onConfirm(); closeConfirm(); }} className="flex-1 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white transition-all font-bold text-xs uppercase tracking-widest shadow-[0_0_15px_rgba(139,92,246,0.4)]">LANJUTKAN</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Prompt Modal (Input Text/Textarea yang Fix Fokusnya) */}
+      {inputDialog.show && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#0a0a0f] border border-purple-500/30 p-8 rounded-2xl shadow-[0_0_40px_rgba(139,92,246,0.2)] max-w-xl w-full mx-4 animate-in zoom-in-95 duration-200">
+            <h3 className="text-center text-purple-400 font-black tracking-widest uppercase mb-6">{inputDialog.title}</h3>
+            
+            {inputDialog.type === 'textarea' ? (
+              <textarea 
+                autoFocus
+                className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-sm text-white outline-none focus:border-purple-500 mb-6 font-mono min-h-[150px]" 
+                placeholder={inputDialog.placeholder}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+              />
+            ) : (
+              <input 
+                type={inputDialog.type} 
+                autoFocus
+                className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-sm text-white outline-none focus:border-purple-500 mb-6 font-mono" 
+                placeholder={inputDialog.placeholder}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+              />
+            )}
+
+            <div className="flex gap-4">
+              <button onClick={closePrompt} className="flex-1 py-3 rounded-xl border border-white/10 text-gray-400 hover:bg-white/5 hover:text-white transition-all font-bold text-xs uppercase tracking-widest">Batal</button>
+              <button onClick={() => { inputDialog.onSubmit(inputValue); closePrompt(); }} className="flex-1 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white transition-all font-bold text-xs uppercase tracking-widest shadow-[0_0_15px_rgba(139,92,246,0.4)]">Kirim</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ---------------------------------------------------------------- */}
+
+
+      {/* SIDEBAR NAVIGATION */}
       <div className={`${sidebarOpen ? 'w-64' : 'w-20'} transition-all bg-black/20 border-r border-white/5 flex flex-col z-20 backdrop-blur-xl shadow-[4px_0_15px_rgba(0,0,0,0.5)]`}>
         <div className="h-20 flex items-center justify-between px-6 border-b border-white/5">
           {sidebarOpen && <h1 className="text-lg font-black tracking-tighter text-purple-400">LILA STORE <span className="text-[10px] bg-purple-500/20 px-1 rounded">VVIP</span></h1>}
@@ -337,6 +410,7 @@ export default function App() {
         </div>
       </div>
 
+      {/* CORE DISPLAY */}
       <div className="flex-1 flex flex-col relative">
         <header className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-black/10 backdrop-blur-md relative z-30">
           <div className="text-[10px] font-mono text-purple-500 tracking-[0.2em] uppercase">SYSTEM CORE V5.0 SECURE</div>
@@ -381,6 +455,7 @@ export default function App() {
 
         <main className="flex-1 overflow-y-auto p-8">
           
+          {/* TAB DASHBOARD */}
           {activeTab === 'dashboard' && (
             <div className="space-y-8 animate-in fade-in duration-500">
                <div className="flex items-center justify-between">
@@ -414,12 +489,45 @@ export default function App() {
             </div>
           )}
 
-          {activeTab === 'topup' && <TopupTab topups={topups} products={products} config={config} onUpdate={fetchData} showToast={showToast} showConfirm={showConfirm} showPrompt={showPrompt} />}
+          {/* TAB KONFIRMASI TOPUP */}
+          {activeTab === 'topup' && (
+            <TopupTab 
+              topups={topups} 
+              products={products} 
+              onUpdate={fetchData} 
+              showToast={showToast} 
+              showConfirm={showConfirm} 
+              showPrompt={showPrompt} 
+              sendTgMessage={sendTgMessage}
+              sendTgDocument={sendTgDocument}
+            />
+          )}
           
-          {activeTab === 'orders' && <OrdersTab orders={orders} config={config} onUpdate={fetchData} showToast={showToast} showConfirm={showConfirm} showPrompt={showPrompt} />}
+          {/* TAB ANTREAN ORDER CEK FILE */}
+          {activeTab === 'orders' && (
+            <OrdersTab 
+              orders={orders} 
+              onUpdate={fetchData} 
+              showToast={showToast} 
+              showConfirm={showConfirm} 
+              showPrompt={showPrompt} 
+              sendTgMessage={sendTgMessage}
+              sendTgDocument={sendTgDocument}
+            />
+          )}
 
-          {activeTab === 'customers' && <CustomerTab users={users} onUpdate={fetchData} showToast={showToast} showConfirm={showConfirm} showPrompt={showPrompt} />}
+          {/* TAB DATA PELANGGAN */}
+          {activeTab === 'customers' && (
+            <CustomerTab 
+              users={users} 
+              onUpdate={fetchData} 
+              showToast={showToast} 
+              showConfirm={showConfirm} 
+              showPrompt={showPrompt} 
+            />
+          )}
 
+          {/* TAB BROADCAST */}
           {activeTab === 'broadcast' && (
             <div className="max-w-3xl space-y-6 animate-in fade-in duration-300">
               <h2 className="text-xl font-black uppercase text-white flex items-center gap-2"><Megaphone className="text-purple-400"/> Pusat Broadcast</h2>
@@ -445,16 +553,18 @@ export default function App() {
                     </div>
                   )}
                 </div>
-                <button onClick={sendBroadcast} className="w-full bg-purple-600 py-4 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-purple-500 text-white shadow-lg transition-all active:scale-95">KIRIM BROADCAST SEKARANG</button>
+                <button onClick={handleSendBroadcast} className="w-full bg-purple-600 py-4 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-purple-500 text-white shadow-lg transition-all active:scale-95">KIRIM BROADCAST SEKARANG</button>
               </div>
             </div>
           )}
 
+          {/* TAB SETTING PRODUK */}
           {activeTab === 'products' && (
             <div className="space-y-8 animate-in fade-in duration-300">
                <h2 className="text-xl font-black uppercase text-white flex items-center gap-2"><Package className="text-purple-400"/> Manajemen Produk</h2>
                
                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* FORM INPUT PRODUK */}
                   <div className="bg-white/5 border border-white/10 p-6 rounded-2xl backdrop-blur-md h-fit">
                      <h3 className="text-sm font-mono text-purple-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                        <Plus size={16}/> {productForm.id ? 'Edit Produk' : 'Tambah Produk Baru'}
@@ -491,6 +601,7 @@ export default function App() {
                      </form>
                   </div>
 
+                  {/* LIST PRODUK DARI DATABASE */}
                   <div className="lg:col-span-2 bg-white/5 border border-white/10 p-6 rounded-2xl backdrop-blur-md">
                      <h3 className="text-sm font-mono text-purple-400 uppercase tracking-widest mb-4">Daftar Paket Aktif</h3>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -516,6 +627,7 @@ export default function App() {
             </div>
           )}
 
+          {/* TAB PENGATURAN */}
           {activeTab === 'settings' && (
             <div className="max-w-3xl space-y-8 pb-20 animate-in fade-in duration-300">
                <h2 className="text-xl font-black uppercase text-white">Pengaturan Bot & Mainframe</h2>
@@ -584,6 +696,9 @@ export default function App() {
   );
 }
 
+// -------------------------------------------------------------
+// KOMPONEN PELENGKAP (TIDAK ADA YANG DIPOTONG/DIRINGKAS)
+// -------------------------------------------------------------
 function StatCard({ title, val, color, onClick }) {
   return (
     <div onClick={onClick} className={`bg-white/5 border border-white/10 rounded-2xl p-6 relative overflow-hidden group hover:border-white/20 transition-all backdrop-blur-md shadow-lg border-l-4 ${color} cursor-pointer`}>
@@ -604,7 +719,8 @@ function NavItem({ icon, label, active, onClick, open }) {
   );
 }
 
-function TopupTab({ topups, products, config, onUpdate, showToast, showConfirm, showPrompt }) {
+// COMPONENT: TOPUP TAB 
+function TopupTab({ topups, products, onUpdate, showToast, showConfirm, showPrompt, sendTgMessage, sendTgDocument }) {
   const [previewImg, setPreviewImg] = useState(null);
 
   const handleAction = (id, status, telegram_id, package_name) => {
@@ -616,17 +732,7 @@ function TopupTab({ topups, products, config, onUpdate, showToast, showConfirm, 
           if (error) {
             showToast(error.message, 'error');
           } else {
-            if (config.bot_token) {
-              await fetch(`https://api.telegram.org/bot${config.bot_token}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  chat_id: telegram_id,
-                  text: `❌ *PEMBAYARAN DITOLAK*\n\nPaket: ${package_name}\nAlasan: ${reason}\n\nSilakan hubungi admin jika ada kendala.`,
-                  parse_mode: 'Markdown'
-                })
-              }).catch(()=>{});
-            }
+            await sendTgMessage(telegram_id, `❌ *PEMBAYARAN DITOLAK*\n\nPaket: ${package_name}\nAlasan: ${reason}\n\nSilakan hubungi admin jika ada kendala.`);
             showToast('Transaksi ditolak dan notifikasi terkirim.', 'success'); 
             onUpdate(); 
           }
@@ -653,28 +759,12 @@ function TopupTab({ topups, products, config, onUpdate, showToast, showConfirm, 
           if (error) {
             showToast(error.message, 'error');
           } else {
-            if (config.bot_token) {
-              if (productText && productText.trim() !== '') {
-                const formData = new FormData();
-                formData.append('chat_id', telegram_id);
-                formData.append('caption', `✅ *PEMBAYARAN BERHASIL*\n\nPaket: ${package_name}\n\nTerima kasih telah berbelanja di Lila Store! Pesananmu ada di file terlampir di bawah ini 💜`);
-                formData.append('parse_mode', 'Markdown');
-                const blob = new Blob([productText], { type: 'text/plain' });
-                const fileName = `${package_name.replace(/\s+/g, '_')}_LilaStore.txt`;
-                formData.append('document', blob, fileName);
-
-                await fetch(`https://api.telegram.org/bot${config.bot_token}/sendDocument`, { method: 'POST', body: formData }).catch(()=>{});
-              } else {
-                await fetch(`https://api.telegram.org/bot${config.bot_token}/sendMessage`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    chat_id: telegram_id,
-                    text: `✅ *PEMBAYARAN BERHASIL*\n\nPaket: ${package_name}\n\nKuota kamu sudah otomatis ditambahkan. Terima kasih telah berbelanja di Lila Store! 💜`,
-                    parse_mode: 'Markdown'
-                  })
-                }).catch(()=>{});
-              }
+            if (productText && productText.trim() !== '') {
+              const blob = new Blob([productText], { type: 'text/plain' });
+              const fileName = `${package_name.replace(/\s+/g, '_')}_LilaStore.txt`;
+              await sendTgDocument(telegram_id, `✅ *PEMBAYARAN BERHASIL*\n\nPaket: ${package_name}\n\nTerima kasih telah berbelanja di Lila Store! Pesananmu ada di file terlampir di bawah ini 💜`, blob, fileName);
+            } else {
+              await sendTgMessage(telegram_id, `✅ *PEMBAYARAN BERHASIL*\n\nPaket: ${package_name}\n\nKuota kamu sudah otomatis ditambahkan. Terima kasih telah berbelanja di Lila Store! 💜`);
             }
             showToast('Transaksi diterima & Produk terkirim!', 'success'); 
             onUpdate(); 
@@ -734,7 +824,8 @@ function TopupTab({ topups, products, config, onUpdate, showToast, showConfirm, 
   );
 }
 
-function OrdersTab({ orders, config, onUpdate, showToast, showConfirm, showPrompt }) {
+// COMPONENT: ANTREAN ORDER SERVIS (CEK FILE)
+function OrdersTab({ orders, onUpdate, showToast, showConfirm, showPrompt, sendTgMessage, sendTgDocument }) {
   const fileInputRef = useRef(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
@@ -745,18 +836,9 @@ function OrdersTab({ orders, config, onUpdate, showToast, showConfirm, showPromp
     showConfirm(`Kirim file hasil cek (${file.name}) ke user ini?`, async () => {
       await supabase.from('orders').update({ status: 'SUCCESS' }).eq('id', selectedOrder.id);
       
-      if (config.bot_token) {
-        const formData = new FormData();
-        formData.append('chat_id', selectedOrder.telegram_id);
-        formData.append('caption', `✅ *HASIL PENGECEKAN SELESAI*\n\nServis: ${selectedOrder.service_type}\nDetail: ${selectedOrder.details}\n\nTerima kasih telah menggunakan layanan Lila Store! 💜`);
-        formData.append('parse_mode', 'Markdown');
-        formData.append('document', file);
-
-        await fetch(`https://api.telegram.org/bot${config.bot_token}/sendDocument`, {
-          method: 'POST',
-          body: formData
-        }).catch(err => console.log(err));
-      }
+      const caption = `✅ *HASIL PENGECEKAN SELESAI*\n\nServis: ${selectedOrder.service_type}\nDetail: ${selectedOrder.details}\n\nTerima kasih telah menggunakan layanan Lila Store! 💜`;
+      await sendTgDocument(selectedOrder.telegram_id, caption, file, file.name);
+      
       showToast('Hasil berhasil dikirim!', 'success');
       setSelectedOrder(null);
       onUpdate();
@@ -775,17 +857,8 @@ function OrdersTab({ orders, config, onUpdate, showToast, showConfirm, showPromp
 
          await supabase.from('orders').update({ status: 'REJECTED', reject_reason: reason }).eq('id', order.id);
          
-         if(config.bot_token) {
-            await fetch(`https://api.telegram.org/bot${config.bot_token}/sendMessage`, { 
-              method: 'POST', 
-              headers: { 'Content-Type': 'application/json' }, 
-              body: JSON.stringify({ 
-                chat_id: order.telegram_id, 
-                text: `❌ *CEK DITOLAK*\n\nAlasan: ${reason}\n\n*Kuota kamu telah dikembalikan (Refund).*`, 
-                parse_mode: 'Markdown' 
-              }) 
-            }).catch(()=>{});
-         }
+         await sendTgMessage(order.telegram_id, `❌ *CEK DITOLAK*\n\nAlasan: ${reason}\n\n*Kuota kamu telah dikembalikan (Refund).*`);
+         
          showToast('Ditolak & Kuota kembali.', 'success'); 
          onUpdate();
       });
