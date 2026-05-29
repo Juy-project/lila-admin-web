@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { 
   LayoutDashboard, Users, CreditCard, Settings, Menu, X, RefreshCw, 
   Megaphone, Upload, Save, Key, ShieldAlert, Camera, LogOut, TrendingUp, 
-  Check, Info, CheckCircle2, AlertTriangle, ImageIcon, Package, Plus, Trash2, Edit3, Activity
+  Check, Info, CheckCircle2, AlertTriangle, ImageIcon, Package, Plus, Trash2, Edit3, FileText, Download
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -19,23 +19,25 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   
-  // Custom Notification States
+  // Custom Notification & Modal States
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' });
   const [dialog, setDialog] = useState({ show: false, msg: '', onConfirm: null });
+  const [inputDialog, setInputDialog] = useState({ show: false, title: '', placeholder: '', type: 'text', onSubmit: null });
+  const [inputValue, setInputValue] = useState('');
   
   // Data States
   const [users, setUsers] = useState([]);
   const [topups, setTopups] = useState([]);
   const [products, setProducts] = useState([]);
+  const [orders, setOrders] = useState([]);
   const [config, setConfig] = useState({});
   const [bcMsg, setBcMsg] = useState('');
   const [bcImg, setBcImg] = useState('');
   const [trends, setTrends] = useState([]);
 
   // Form State Produk
-  const [productForm, setProductForm] = useState({ id: null, name: '', price: '', quota_turnitin: '', quota_ai: '' });
+  const [productForm, setProductForm] = useState({ id: null, name: '', description: '', price: '', quota_turnitin: '', quota_ai: '' });
 
-  // --- SISTEM NOTIFIKASI CYBERPUNK ---
   const showToast = (msg, type = 'success') => {
     setToast({ show: true, msg, type });
     setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 3000);
@@ -46,6 +48,15 @@ export default function App() {
   };
 
   const closeConfirm = () => setDialog({ show: false, msg: '', onConfirm: null });
+
+  const showPrompt = (title, placeholder, type, onSubmitCallback) => {
+    setInputValue('');
+    setInputDialog({ show: true, title, placeholder, type, onSubmit: onSubmitCallback });
+  };
+
+  const closePrompt = () => {
+    setInputDialog({ show: false, title: '', placeholder: '', type: 'text', onSubmit: null });
+  };
 
   // --- SISTEM FINGERPRINT (IP & DEVICE LOGIC) ---
   const checkSession = async () => {
@@ -62,7 +73,6 @@ export default function App() {
       } else {
         localStorage.removeItem('lila_sec_protocol');
         setIsLoggedIn(false);
-        showToast('AKSES DITOLAK: Perangkat atau Lokasi Berbeda. Silakan Login Ulang.', 'error');
       }
     } catch (error) {
       const savedSession = JSON.parse(localStorage.getItem('lila_sec_protocol'));
@@ -81,12 +91,14 @@ export default function App() {
     const { data: u } = await supabase.from('users').select('*').order('created_at', { ascending: true });
     const { data: t } = await supabase.from('topups').select('*').order('created_at', { ascending: true });
     const { data: p } = await supabase.from('products').select('*').order('created_at', { ascending: true });
+    const { data: o } = await supabase.from('orders').select('*').order('created_at', { ascending: true });
     const { data: c } = await supabase.from('settings').select('*').eq('id', 1).single();
     
     if (u) setUsers(u);
     if (c) setConfig(c);
     if (t) setTopups(t);
     if (p) setProducts(p);
+    if (o) setOrders(o);
 
     const days = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
     const data = days.map(day => ({ name: day, users: 0, pending: 0, success: 0, revenue: 0 }));
@@ -179,28 +191,27 @@ export default function App() {
     });
   };
 
-  // --- MANAJEMEN CRUD PRODUK ---
+  // --- MANAJEMEN CRUD PRODUK DENGAN DESKRIPSI ---
   const handleSaveProduct = async (e) => {
     e.preventDefault();
     if (!productForm.name || !productForm.price) return showToast('Nama & Harga wajib diisi!', 'error');
 
     const payload = {
       name: productForm.name,
+      description: productForm.description,
       price: parseInt(productForm.price),
       quota_turnitin: parseInt(productForm.quota_turnitin || 0),
       quota_ai: parseInt(productForm.quota_ai || 0)
     };
 
     if (productForm.id) {
-      // Update
       const { error } = await supabase.from('products').update(payload).eq('id', productForm.id);
       if (error) showToast(error.message, 'error');
-      else { showToast('Produk Berhasil Diperbarui!'); fetchData(); setProductForm({ id: null, name: '', price: '', quota_turnitin: '', quota_ai: '' }); }
+      else { showToast('Produk Berhasil Diperbarui!'); fetchData(); setProductForm({ id: null, name: '', description: '', price: '', quota_turnitin: '', quota_ai: '' }); }
     } else {
-      // Insert New
       const { error } = await supabase.from('products').insert([payload]);
       if (error) showToast(error.message, 'error');
-      else { showToast('Produk Berhasil Ditambahkan!'); fetchData(); setProductForm({ id: null, name: '', price: '', quota_turnitin: '', quota_ai: '' }); }
+      else { showToast('Produk Berhasil Ditambahkan!'); fetchData(); setProductForm({ id: null, name: '', description: '', price: '', quota_turnitin: '', quota_ai: '' }); }
     }
   };
 
@@ -212,7 +223,7 @@ export default function App() {
     });
   };
 
-  // --- RENDER NOTIFIKASI TOAST ---
+  // --- RENDER COMPONENT KECIL ---
   const ToastComponent = () => {
     if (!toast.show) return null;
     const isError = toast.type === 'error';
@@ -226,7 +237,6 @@ export default function App() {
     );
   };
 
-  // --- RENDER MODAL KONFIRMASI ---
   const ConfirmModal = () => {
     if (!dialog.show) return null;
     return (
@@ -241,6 +251,41 @@ export default function App() {
           <div className="flex gap-4">
             <button onClick={closeConfirm} className="flex-1 py-3 rounded-xl border border-white/10 text-gray-400 hover:bg-white/5 hover:text-white transition-all font-bold text-xs uppercase tracking-widest">BATAL</button>
             <button onClick={async () => { await dialog.onConfirm(); closeConfirm(); }} className="flex-1 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white transition-all font-bold text-xs uppercase tracking-widest shadow-[0_0_15px_rgba(139,92,246,0.4)]">LANJUTKAN</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const PromptModal = () => {
+    if (!inputDialog.show) return null;
+    return (
+      <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="bg-[#0a0a0f] border border-purple-500/30 p-8 rounded-2xl shadow-[0_0_40px_rgba(139,92,246,0.2)] max-w-xl w-full mx-4 animate-in zoom-in-95 duration-200">
+          <h3 className="text-center text-purple-400 font-black tracking-widest uppercase mb-6">{inputDialog.title}</h3>
+          
+          {inputDialog.type === 'textarea' ? (
+            <textarea 
+              autoFocus
+              className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-sm text-white outline-none focus:border-purple-500 mb-6 font-mono min-h-[150px]" 
+              placeholder={inputDialog.placeholder}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+            />
+          ) : (
+            <input 
+              type={inputDialog.type} 
+              autoFocus
+              className="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-sm text-white outline-none focus:border-purple-500 mb-6 font-mono" 
+              placeholder={inputDialog.placeholder}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+            />
+          )}
+
+          <div className="flex gap-4">
+            <button onClick={closePrompt} className="flex-1 py-3 rounded-xl border border-white/10 text-gray-400 hover:bg-white/5 hover:text-white transition-all font-bold text-xs uppercase tracking-widest">Batal</button>
+            <button onClick={() => { inputDialog.onSubmit(inputValue); closePrompt(); }} className="flex-1 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white transition-all font-bold text-xs uppercase tracking-widest shadow-[0_0_15px_rgba(139,92,246,0.4)]">Kirim</button>
           </div>
         </div>
       </div>
@@ -274,6 +319,7 @@ export default function App() {
     <div className="flex h-screen bg-transparent font-sans text-gray-100 overflow-hidden">
       <ToastComponent />
       <ConfirmModal />
+      <PromptModal />
       
       {/* SIDEBAR NAVIGATION */}
       <div className={`${sidebarOpen ? 'w-64' : 'w-20'} transition-all bg-black/20 border-r border-white/5 flex flex-col z-20 backdrop-blur-xl shadow-[4px_0_15px_rgba(0,0,0,0.5)]`}>
@@ -281,13 +327,14 @@ export default function App() {
           {sidebarOpen && <h1 className="text-lg font-black tracking-tighter text-purple-400">LILA STORE <span className="text-[10px] bg-purple-500/20 px-1 rounded">VVIP</span></h1>}
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-gray-400 hover:text-white"><Menu size={20} /></button>
         </div>
-        <nav className="flex-1 px-4 py-8 space-y-2">
+        <nav className="flex-1 px-4 py-8 space-y-2 overflow-y-auto">
           <NavItem icon={<LayoutDashboard size={20}/>} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} open={sidebarOpen} />
           <NavItem icon={<CreditCard size={20}/>} label="Konfirmasi Topup" active={activeTab === 'topup'} onClick={() => setActiveTab('topup')} open={sidebarOpen} />
+          <NavItem icon={<FileText size={20}/>} label="Antrean Cek" active={activeTab === 'orders'} onClick={() => setActiveTab('orders')} open={sidebarOpen} />
           <NavItem icon={<Package size={20}/>} label="Setting Produk" active={activeTab === 'products'} onClick={() => setActiveTab('products')} open={sidebarOpen} />
           <NavItem icon={<Users size={20}/>} label="Data Pelanggan" active={activeTab === 'customers'} onClick={() => setActiveTab('customers')} open={sidebarOpen} />
           <NavItem icon={<Megaphone size={20}/>} label="Pusat Broadcast" active={activeTab === 'broadcast'} onClick={() => setActiveTab('broadcast')} open={sidebarOpen} />
-          <NavItem icon={<Settings size={20}/>} label="Pengaturan" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} open={sidebarOpen} />
+          <NavItem icon={<Settings size={20}/>} label="Pengaturan Bot" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} open={sidebarOpen} />
         </nav>
         <div className="p-4 border-t border-white/5">
           <button onClick={handleLogout} className="flex items-center gap-4 text-red-400 hover:bg-red-500/10 w-full p-3 rounded-xl transition-all">
@@ -353,8 +400,8 @@ export default function App() {
                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <StatCard title="Total Pelanggan" val={users.length} color="border-purple-500" onClick={() => setActiveChart('users')} />
                   <StatCard title="Top Up Pending" val={topups.filter(t=>t.status==='PENDING').length} color="border-yellow-500" onClick={() => setActiveChart('pending')} />
-                  <StatCard title="Transaksi Sukses" val={topups.filter(t=>t.status==='SUCCESS').length} color="border-green-500" onClick={() => setActiveChart('success')} />
-                  <StatCard title="Omset (IDR)" val={`Rp ${topups.filter(t=>t.status==='SUCCESS').reduce((a,c)=>a+(c.amount||0), 0).toLocaleString()}`} color="border-fuchsia-500" onClick={() => setActiveChart('revenue')} />
+                  <StatCard title="Order Menunggu" val={orders.filter(o=>o.status==='PENDING').length} color="border-blue-500" onClick={() => setActiveChart('pending')} />
+                  <StatCard title="Omset (IDR)" val={`Rp ${topups.filter(t=>t.status==='SUCCESS').reduce((a,c)=>a+(c.amount||0), 0).toLocaleString()}`} color="border-green-500" onClick={() => setActiveChart('revenue')} />
                </div>
 
                <div className="bg-white/5 border border-white/10 p-6 rounded-2xl backdrop-blur-md shadow-lg h-80">
@@ -377,10 +424,13 @@ export default function App() {
           )}
 
           {/* TAB KONFIRMASI TOPUP */}
-          {activeTab === 'topup' && <TopupTab topups={topups} products={products} config={config} onUpdate={fetchData} showToast={showToast} showConfirm={showConfirm} />}
+          {activeTab === 'topup' && <TopupTab topups={topups} products={products} config={config} onUpdate={fetchData} showToast={showToast} showConfirm={showConfirm} showPrompt={showPrompt} />}
           
+          {/* TAB ANTREAN ORDER CEK FILE */}
+          {activeTab === 'orders' && <OrdersTab orders={orders} config={config} onUpdate={fetchData} showToast={showToast} showConfirm={showConfirm} showPrompt={showPrompt} />}
+
           {/* TAB DATA PELANGGAN */}
-          {activeTab === 'customers' && <CustomerTab users={users} onUpdate={fetchData} showToast={showToast} showConfirm={showConfirm} />}
+          {activeTab === 'customers' && <CustomerTab users={users} onUpdate={fetchData} showToast={showToast} showConfirm={showConfirm} showPrompt={showPrompt} />}
 
           {/* TAB BROADCAST */}
           {activeTab === 'broadcast' && (
@@ -413,7 +463,7 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB SETTING PRODUK */}
+          {/* TAB SETTING PRODUK (TAMBAH DESKRIPSI) */}
           {activeTab === 'products' && (
             <div className="space-y-8 animate-in fade-in duration-300">
                <h2 className="text-xl font-black uppercase text-white flex items-center gap-2"><Package className="text-purple-400"/> Manajemen Produk</h2>
@@ -426,8 +476,12 @@ export default function App() {
                      </h3>
                      <form onSubmit={handleSaveProduct} className="space-y-4">
                         <div>
-                           <label className="text-[9px] text-gray-400 font-mono">NAMA PAKET (Sesuai Bot)</label>
-                           <input type="text" value={productForm.name} onChange={e => setProductForm({...productForm, name: e.target.value})} className="w-full bg-black/40 border border-white/10 p-3 rounded-xl text-xs outline-none focus:border-purple-500 text-white font-bold" placeholder="Contoh: Paket Basic" />
+                           <label className="text-[9px] text-gray-400 font-mono">NAMA PAKET</label>
+                           <input type="text" value={productForm.name} onChange={e => setProductForm({...productForm, name: e.target.value})} className="w-full bg-black/40 border border-white/10 p-3 rounded-xl text-xs outline-none focus:border-purple-500 text-white font-bold" placeholder="Contoh: Script Auto Login" />
+                        </div>
+                        <div>
+                           <label className="text-[9px] text-gray-400 font-mono">DESKRIPSI (Tampil di Bot)</label>
+                           <textarea value={productForm.description} onChange={e => setProductForm({...productForm, description: e.target.value})} className="w-full bg-black/40 border border-white/10 p-3 rounded-xl text-xs outline-none focus:border-purple-500 text-white font-bold min-h-[80px]" placeholder="Berisi informasi kuota & fitur..." />
                         </div>
                         <div>
                            <label className="text-[9px] text-gray-400 font-mono">HARGA (Rp)</label>
@@ -435,17 +489,17 @@ export default function App() {
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                            <div>
-                              <label className="text-[9px] text-gray-400 font-mono">KUOTA TURNITIN</label>
+                              <label className="text-[9px] text-gray-400 font-mono">BONUS KUOTA TURNITIN</label>
                               <input type="number" value={productForm.quota_turnitin} onChange={e => setProductForm({...productForm, quota_turnitin: e.target.value})} className="w-full bg-black/40 border border-white/10 p-3 rounded-xl text-xs outline-none focus:border-purple-500 text-white font-bold" placeholder="0" />
                            </div>
                            <div>
-                              <label className="text-[9px] text-gray-400 font-mono">KUOTA AI CHECKER</label>
+                              <label className="text-[9px] text-gray-400 font-mono">BONUS KUOTA AI</label>
                               <input type="number" value={productForm.quota_ai} onChange={e => setProductForm({...productForm, quota_ai: e.target.value})} className="w-full bg-black/40 border border-white/10 p-3 rounded-xl text-xs outline-none focus:border-purple-500 text-white font-bold" placeholder="0" />
                            </div>
                         </div>
                         <div className="flex gap-2 pt-2">
                            {productForm.id && (
-                             <button type="button" onClick={() => setProductForm({ id: null, name: '', price: '', quota_turnitin: '', quota_ai: '' })} className="flex-1 bg-white/5 border border-white/10 py-3 rounded-xl text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-white">Batal</button>
+                             <button type="button" onClick={() => setProductForm({ id: null, name: '', description: '', price: '', quota_turnitin: '', quota_ai: '' })} className="flex-1 bg-white/5 border border-white/10 py-3 rounded-xl text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-white">Batal</button>
                            )}
                            <button type="submit" className="flex-1 bg-purple-600 hover:bg-purple-500 py-3 rounded-xl text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-purple-600/20"><Save size={14} className="inline mr-2"/>Simpan</button>
                         </div>
@@ -481,7 +535,7 @@ export default function App() {
           {/* TAB PENGATURAN */}
           {activeTab === 'settings' && (
             <div className="max-w-3xl space-y-8 pb-20 animate-in fade-in duration-300">
-               <h2 className="text-xl font-black uppercase text-white">Pengaturan Mainframe</h2>
+               <h2 className="text-xl font-black uppercase text-white">Pengaturan Bot & Mainframe</h2>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-white/5 border border-white/10 p-6 rounded-2xl backdrop-blur-md space-y-4">
                      <h3 className="text-xs font-mono text-purple-400 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2"><Key size={14}/> Keamanan Akses</h3>
@@ -490,24 +544,28 @@ export default function App() {
                         <input type="text" value={config.owner_id || ''} onChange={e=>setConfig({...config, owner_id: e.target.value})} className="w-full bg-black/50 border border-white/10 p-3 rounded-xl outline-none focus:border-purple-500 text-cyan-300 text-xs font-mono" />
                      </div>
                      <div>
+                        <label className="text-[9px] font-mono text-gray-400 block mb-1">USERNAME ADMIN (@)</label>
+                        <input type="text" value={config.owner_username || ''} onChange={e=>setConfig({...config, owner_username: e.target.value})} className="w-full bg-black/50 border border-white/10 p-3 rounded-xl outline-none focus:border-purple-500 text-cyan-300 text-xs font-mono" placeholder="@BossJuy" />
+                     </div>
+                     <div>
                         <label className="text-[9px] font-mono text-gray-400 block mb-1">PASSWORD SISTEM</label>
                         <input type="text" value={config.password || ''} onChange={e=>setConfig({...config, password: e.target.value})} className="w-full bg-black/50 border border-white/10 p-3 rounded-xl outline-none focus:border-purple-500 text-cyan-300 text-xs font-mono" />
                      </div>
                   </div>
                   <div className="bg-white/5 border border-white/10 p-6 rounded-2xl backdrop-blur-md space-y-4">
-                     <h3 className="text-xs font-mono text-purple-400 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2"><Settings size={14}/> API Bot Utama</h3>
+                     <h3 className="text-xs font-mono text-purple-400 uppercase tracking-widest border-b border-white/5 pb-2 flex items-center gap-2"><Settings size={14}/> Teks Menu Bot</h3>
                      <div>
-                        <label className="text-[9px] font-mono text-gray-400 block mb-1">TOKEN BOT</label>
-                        <input type="text" value={config.bot_token || ''} onChange={e=>setConfig({...config, bot_token: e.target.value})} className="w-full bg-black/50 border border-white/10 p-3 rounded-xl outline-none focus:border-purple-500 text-xs text-white font-mono" />
+                        <label className="text-[9px] font-mono text-gray-400 block mb-1">PESAN SAMBUTAN START (/start)</label>
+                        <textarea value={config.welcome_message || ''} onChange={e=>setConfig({...config, welcome_message: e.target.value})} className="w-full bg-black/50 border border-white/10 p-3 rounded-xl outline-none focus:border-purple-500 text-xs text-white h-20" />
                      </div>
                      <div>
-                        <label className="text-[9px] font-mono text-gray-400 block mb-1">PESAN SAMBUTAN START</label>
-                        <input type="text" value={config.welcome_message || ''} onChange={e=>setConfig({...config, welcome_message: e.target.value})} className="w-full bg-black/50 border border-white/10 p-3 rounded-xl outline-none focus:border-purple-500 text-xs text-white" />
+                        <label className="text-[9px] font-mono text-gray-400 block mb-1">PESAN MENU BANTUAN</label>
+                        <textarea value={config.bot_help || ''} onChange={e=>setConfig({...config, bot_help: e.target.value})} className="w-full bg-black/50 border border-white/10 p-3 rounded-xl outline-none focus:border-purple-500 text-xs text-white h-20" />
                      </div>
                   </div>
                </div>
                <div className="bg-white/5 border border-white/10 p-6 rounded-2xl backdrop-blur-md space-y-4">
-                  <h3 className="text-xs font-mono text-purple-400 uppercase tracking-widest">PENGATURAN GAMBAR QRIS</h3>
+                  <h3 className="text-xs font-mono text-purple-400 uppercase tracking-widest">PENGATURAN KONEKSI & GAMBAR QRIS</h3>
                   <div className="flex flex-col md:flex-row gap-6 items-center">
                     <div className="flex-1 w-full relative">
                        <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'qris_url')} className="absolute inset-0 opacity-0 z-10 cursor-pointer" />
@@ -518,6 +576,10 @@ export default function App() {
                     {config.qris_url && (
                        <img src={config.qris_url} className="w-32 h-32 object-contain border border-white/10 rounded-xl bg-white/5 p-2 shadow-[0_0_15px_rgba(255,255,255,0.05)]" />
                     )}
+                  </div>
+                  <div className="pt-4 border-t border-white/5">
+                     <label className="text-[9px] font-mono text-gray-400 block mb-1">TOKEN BOT TELEGRAM</label>
+                     <input type="text" value={config.bot_token || ''} onChange={e=>setConfig({...config, bot_token: e.target.value})} className="w-full bg-black/50 border border-white/10 p-3 rounded-xl outline-none focus:border-purple-500 text-xs text-white font-mono" />
                   </div>
                </div>
                <div className="flex items-center justify-between p-4 bg-red-950/20 border border-red-500/20 rounded-2xl backdrop-blur-md">
@@ -559,79 +621,83 @@ function NavItem({ icon, label, active, onClick, open }) {
   );
 }
 
-// COMPONENT: TOPUP TAB (DENGAN TELEGRAM NOTIFICATION API)
-function TopupTab({ topups, products, config, onUpdate, showToast, showConfirm }) {
+// COMPONENT: TOPUP TAB 
+function TopupTab({ topups, products, config, onUpdate, showToast, showConfirm, showPrompt }) {
   const [previewImg, setPreviewImg] = useState(null);
 
   const handleAction = (id, status, telegram_id, package_name) => {
     if (status === 'REJECTED') {
-      const reason = prompt("Masukkan alasan penolakan transaksi ini:");
-      if (!reason) return; // Batalkan jika admin tidak mengisi alasan
-
-      showConfirm(`Tolak transaksi ini dengan alasan: "${reason}"?`, async () => {
-        const { error } = await supabase.from('topups').update({ status, reject_reason: reason }).eq('id', id);
-        
-        if (error) {
-          showToast(error.message, 'error');
-        } else {
-          // --- MENGIRIM NOTIFIKASI TELEGRAM KE USER ---
-          if (config.bot_token) {
-            await fetch(`https://api.telegram.org/bot${config.bot_token}/sendMessage`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chat_id: telegram_id,
-                text: `❌ *PEMBAYARAN DITOLAK*\n\nPaket: ${package_name}\nAlasan: ${reason}\n\nSilakan hubungi admin jika ada kendala.`,
-                parse_mode: 'Markdown'
-              })
-            }).catch(e => console.log('Telegram API Error:', e));
+      showPrompt("Alasan Penolakan", "Ketik alasan penolakan di sini...", "text", (reason) => {
+        if (!reason) return;
+        showConfirm(`Tolak transaksi ini dengan alasan: "${reason}"?`, async () => {
+          const { error } = await supabase.from('topups').update({ status, reject_reason: reason }).eq('id', id);
+          if (error) {
+            showToast(error.message, 'error');
+          } else {
+            if (config.bot_token) {
+              await fetch(`https://api.telegram.org/bot${config.bot_token}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  chat_id: telegram_id,
+                  text: `❌ *PEMBAYARAN DITOLAK*\n\nPaket: ${package_name}\nAlasan: ${reason}\n\nSilakan hubungi admin jika ada kendala.`,
+                  parse_mode: 'Markdown'
+                })
+              }).catch(()=>{});
+            }
+            showToast('Transaksi ditolak dan notifikasi terkirim.', 'success'); 
+            onUpdate(); 
           }
-
-          showToast('Transaksi berhasil ditolak dan notifikasi alasan terkirim.', 'success'); 
-          onUpdate(); 
-        }
+        });
       });
     } else if (status === 'SUCCESS') {
-      showConfirm(`Terima transaksi ini? Kuota pelanggan akan otomatis ditambahkan sesuai setting produk.`, async () => {
-        
-        // 1. Cari bonus kuota dari data paket dinamis
-        const matchProd = products.find(p => p.name === package_name);
-        const addTurnitin = matchProd ? matchProd.quota_turnitin : 0;
-        const addAi = matchProd ? matchProd.quota_ai : 0;
+      showPrompt("Kirim Produk (Optional)", "Masukkan script/link produk yang akan dibuat jadi file .txt (Kosongkan jika hanya topup kuota)", "textarea", async (productText) => {
+        showConfirm(`Terima transaksi ini? Kuota akan ditambah dan produk (jika diisi) akan dikirim.`, async () => {
+          
+          const matchProd = products.find(p => p.name === package_name);
+          const addTurnitin = matchProd ? matchProd.quota_turnitin : 0;
+          const addAi = matchProd ? matchProd.quota_ai : 0;
 
-        // 2. Ambil kuota user saat ini
-        const { data: user } = await supabase.from('users').select('quota_turnitin, quota_ai').eq('telegram_id', telegram_id).single();
-        
-        if (user) {
-          const newTurnitin = (user.quota_turnitin || 0) + addTurnitin;
-          const newAi = (user.quota_ai || 0) + addAi;
-
-          // 3. Suntik kuota otomatis ke tabel users
-          await supabase.from('users').update({ quota_turnitin: newTurnitin, quota_ai: newAi }).eq('telegram_id', telegram_id);
-        }
-
-        // 4. Update status topup menjadi SUCCESS
-        const { error } = await supabase.from('topups').update({ status }).eq('id', id);
-        
-        if (error) {
-          showToast(error.message, 'error');
-        } else {
-          // --- MENGIRIM NOTIFIKASI TELEGRAM KE USER ---
-          if (config.bot_token) {
-            await fetch(`https://api.telegram.org/bot${config.bot_token}/sendMessage`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chat_id: telegram_id,
-                text: `✅ *PEMBAYARAN BERHASIL*\n\nPaket: ${package_name}\n\nKuota kamu sudah otomatis ditambahkan. Terima kasih telah berbelanja di Lila Store! 💜`,
-                parse_mode: 'Markdown'
-              })
-            }).catch(e => console.log('Telegram API Error:', e));
+          const { data: user } = await supabase.from('users').select('quota_turnitin, quota_ai').eq('telegram_id', telegram_id).single();
+          
+          if (user) {
+            const newTurnitin = (user.quota_turnitin || 0) + addTurnitin;
+            const newAi = (user.quota_ai || 0) + addAi;
+            await supabase.from('users').update({ quota_turnitin: newTurnitin, quota_ai: newAi }).eq('telegram_id', telegram_id);
           }
 
-          showToast('Transaksi diterima, kuota ditambah & notifikasi terkirim!', 'success'); 
-          onUpdate(); 
-        }
+          const { error } = await supabase.from('topups').update({ status }).eq('id', id);
+          
+          if (error) {
+            showToast(error.message, 'error');
+          } else {
+            if (config.bot_token) {
+              if (productText && productText.trim() !== '') {
+                const formData = new FormData();
+                formData.append('chat_id', telegram_id);
+                formData.append('caption', `✅ *PEMBAYARAN BERHASIL*\n\nPaket: ${package_name}\n\nTerima kasih telah berbelanja di Lila Store! Pesananmu ada di file terlampir di bawah ini 💜`);
+                formData.append('parse_mode', 'Markdown');
+                const blob = new Blob([productText], { type: 'text/plain' });
+                const fileName = `${package_name.replace(/\s+/g, '_')}_LilaStore.txt`;
+                formData.append('document', blob, fileName);
+
+                await fetch(`https://api.telegram.org/bot${config.bot_token}/sendDocument`, { method: 'POST', body: formData }).catch(()=>{});
+              } else {
+                await fetch(`https://api.telegram.org/bot${config.bot_token}/sendMessage`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    chat_id: telegram_id,
+                    text: `✅ *PEMBAYARAN BERHASIL*\n\nPaket: ${package_name}\n\nKuota kamu sudah otomatis ditambahkan. Terima kasih telah berbelanja di Lila Store! 💜`,
+                    parse_mode: 'Markdown'
+                  })
+                }).catch(()=>{});
+              }
+            }
+            showToast('Transaksi diterima & Produk terkirim!', 'success'); 
+            onUpdate(); 
+          }
+        });
       });
     }
   };
@@ -647,7 +713,6 @@ function TopupTab({ topups, products, config, onUpdate, showToast, showConfirm }
           {topups.filter(t => t.status === 'PENDING').map(t => (
             <div key={t.id} className="flex flex-col md:flex-row gap-6 justify-between items-center p-4 bg-black/40 rounded-xl border border-white/5">
                <div className="flex items-center gap-4 w-full md:w-auto">
-                 {/* BUKTI FOTO (BISA DIKLIK UNTUK ZOOM POPUP) */}
                  <div 
                     className="w-16 h-16 bg-white/5 border border-white/10 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center relative group"
                     onClick={() => t.payment_proof ? setPreviewImg(t.payment_proof) : null}
@@ -675,7 +740,6 @@ function TopupTab({ topups, products, config, onUpdate, showToast, showConfirm }
           ))}
        </div>
 
-       {/* IN-APP LIGHTBOX ZOOM POPUP */}
        {previewImg && (
          <div className="fixed inset-0 z-[999] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setPreviewImg(null)}>
            <div className="relative max-w-4xl w-full flex flex-col items-center">
@@ -688,19 +752,91 @@ function TopupTab({ topups, products, config, onUpdate, showToast, showConfirm }
   );
 }
 
-function CustomerTab({ users, onUpdate, showToast, showConfirm }) {
-  const handleQuota = (tid, type) => {
-    const newVal = prompt(`Masukkan total kuota ${type} yang baru:`);
-    if (newVal === null || isNaN(newVal)) return;
+// COMPONENT: ANTREAN ORDER SERVIS (CEK FILE)
+function OrdersTab({ orders, config, onUpdate, showToast, showConfirm, showPrompt }) {
+  const fileInputRef = useRef(null);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+
+  const handleProcess = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !selectedOrder) return;
     
-    showConfirm(`Simpan perubahan kuota menjadi ${newVal}?`, async () => {
-      const key = type === 'Turnitin' ? 'quota_turnitin' : 'quota_ai';
-      const { error } = await supabase.from('users').update({ [key]: parseInt(newVal) }).eq('telegram_id', tid);
-      if(error) showToast('Gagal mengubah kuota', 'error');
-      else {
-        showToast(`Kuota ${type} berhasil diperbarui.`, 'success');
-        onUpdate();
+    showConfirm(`Kirim file hasil cek (${file.name}) ke user ini?`, async () => {
+      await supabase.from('orders').update({ status: 'SUCCESS' }).eq('id', selectedOrder.id);
+      
+      if (config.bot_token) {
+        const formData = new FormData();
+        formData.append('chat_id', selectedOrder.telegram_id);
+        formData.append('caption', `✅ *HASIL PENGECEKAN SELESAI*\n\nServis: ${selectedOrder.service_type}\nDetail: ${selectedOrder.details}\n\nTerima kasih telah menggunakan layanan Lila Store! 💜`);
+        formData.append('parse_mode', 'Markdown');
+        formData.append('document', file);
+
+        await fetch(`https://api.telegram.org/bot${config.bot_token}/sendDocument`, {
+          method: 'POST',
+          body: formData
+        }).catch(err => console.log(err));
       }
+      showToast('Hasil berhasil dikirim!', 'success');
+      setSelectedOrder(null);
+      onUpdate();
+    });
+  };
+
+  const handleReject = (order) => {
+    showPrompt("Tolak Cek File", "Masukkan alasan file ditolak...", "text", async (reason) => {
+      if(!reason) return;
+      showConfirm(`Tolak dan kembalikan kuota user?`, async () => {
+         const key = order.service_type === 'Turnitin' ? 'quota_turnitin' : 'quota_ai';
+         const { data: user } = await supabase.from('users').select(key).eq('telegram_id', order.telegram_id).single();
+         if(user) await supabase.from('users').update({ [key]: user[key] + 1 }).eq('telegram_id', order.telegram_id);
+
+         await supabase.from('orders').update({ status: 'REJECTED', reject_reason: reason }).eq('id', order.id);
+         
+         if(config.bot_token) {
+            await fetch(`https://api.telegram.org/bot${config.bot_token}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: order.telegram_id, text: `❌ *CEK DITOLAK*\n\nAlasan: ${reason}\n\n*Kuota kamu telah dikembalikan (Refund).*`, parse_mode: 'Markdown' }) }).catch(()=>{});
+         }
+         showToast('Ditolak & Kuota kembali.', 'success'); onUpdate();
+      });
+    });
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in">
+       <h2 className="text-xl font-black uppercase text-white">Antrean Cek File</h2>
+       <input type="file" ref={fileInputRef} className="hidden" onChange={handleProcess} />
+       
+       <div className="bg-white/5 rounded-2xl p-6 space-y-4 border border-white/10 backdrop-blur-md shadow-xl">
+          {orders.filter(o => o.status === 'PENDING').length === 0 && <p className="text-center text-gray-500 py-8">Belum ada antrean file yang perlu dicek.</p>}
+          
+          {orders.filter(o => o.status === 'PENDING').map(o => (
+            <div key={o.id} className="flex justify-between items-center p-5 bg-black/40 rounded-xl border border-white/5">
+               <div>
+                  <span className={`px-2 py-1 rounded text-[10px] font-bold ${o.service_type === 'Turnitin' ? 'bg-purple-600/20 text-purple-400' : 'bg-fuchsia-600/20 text-fuchsia-400'}`}>{o.service_type}</span>
+                  <p className="text-xs text-gray-300 mt-2 font-mono break-words bg-black/50 p-2 rounded border border-white/5 inline-block">{o.details}</p>
+                  <p className="text-[10px] text-gray-500 mt-2">ID User: {o.telegram_id}</p>
+               </div>
+               <div className="flex flex-col gap-2">
+                  <a href={o.file_url} target="_blank" rel="noreferrer" className="text-center bg-blue-600/20 text-blue-400 border border-blue-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition-all"><Download size={14} className="inline mr-1"/> Download File User</a>
+                  <button onClick={() => { setSelectedOrder(o); fileInputRef.current.click(); }} className="bg-green-600/20 text-green-400 border border-green-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-green-600 hover:text-white transition-all"><Upload size={14} className="inline mr-1"/> Kirim Hasil Cek (PDF/Doc)</button>
+                  <button onClick={() => handleReject(o)} className="bg-red-600/20 text-red-400 border border-red-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition-all"><X size={14} className="inline mr-1"/> Tolak & Refund Kuota</button>
+               </div>
+            </div>
+          ))}
+       </div>
+    </div>
+  );
+}
+
+function CustomerTab({ users, onUpdate, showToast, showConfirm, showPrompt }) {
+  const handleQuota = (tid, type) => {
+    showPrompt(`Update Kuota ${type}`, "Masukkan jumlah kuota baru (angka)", "number", (newVal) => {
+      if (!newVal || isNaN(newVal)) return;
+      showConfirm(`Simpan perubahan kuota menjadi ${newVal}?`, async () => {
+        const key = type === 'Turnitin' ? 'quota_turnitin' : 'quota_ai';
+        const { error } = await supabase.from('users').update({ [key]: parseInt(newVal) }).eq('telegram_id', tid);
+        if(error) showToast('Gagal mengubah kuota', 'error');
+        else { showToast(`Kuota ${type} diperbarui.`, 'success'); onUpdate(); }
+      });
     });
   };
 
