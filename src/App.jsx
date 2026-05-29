@@ -60,6 +60,32 @@ export default function App() {
     setInputDialog({ show: false, title: '', placeholder: '', type: 'text', onSubmit: null });
   };
 
+  // --- API PENGIRIMAN TELEGRAM TERPUSAT ---
+  const sendTgMessage = async (chatId, text) => {
+    console.log("Token Bot dari Config (Text):", config?.bot_token);
+    if (!config?.bot_token) return;
+    try {
+      await fetch(`https://api.telegram.org/bot${config.bot_token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: String(chatId), text, parse_mode: 'Markdown' })
+      });
+    } catch(e) { console.log('Telegram API Error:', e); }
+  };
+
+  const sendTgDocument = async (chatId, caption, blob, fileName) => {
+    console.log("Token Bot dari Config (Doc):", config?.bot_token);
+    if (!config?.bot_token) return;
+    try {
+      const formData = new FormData();
+      formData.append('chat_id', String(chatId));
+      formData.append('caption', caption);
+      formData.append('parse_mode', 'Markdown');
+      formData.append('document', blob, fileName);
+      await fetch(`https://api.telegram.org/bot${config.bot_token}/sendDocument`, { method: 'POST', body: formData });
+    } catch(e) { console.log('Telegram API Error:', e); }
+  };
+
   const checkSession = async () => {
     try {
       const savedSession = JSON.parse(localStorage.getItem('lila_sec_protocol'));
@@ -174,19 +200,19 @@ export default function App() {
   };
 
   const handleSaveSettings = async () => {
-    const { error } = await supabase.from('settings').update(config).eq('id', 1);
+    const { error } = await supabase.from('settings').update(config).eq('id', 1).select();
     if (error) {
       showToast('GAGAL MENYIMPAN: ' + error.message, 'error');
     } else {
+      await fetchData();
       showToast('DATA MAINFRAME BERHASIL DISIMPAN!', 'success');
       setShowProfileModal(false);
-      fetchData();
     }
   };
 
   const handleSendBroadcast = async () => {
     if (!bcMsg) return showToast('Isi pesan broadcast terlebih dahulu!', 'error');
-    if (!config.bot_token) return showToast('Token Bot belum diisi di Pengaturan!', 'error');
+    if (!config?.bot_token) return showToast('Token Bot belum diisi di Pengaturan!', 'error');
 
     showConfirm(`Kirim broadcast ke ${users.length} pengguna aktif sekarang?`, async () => {
       showToast(`PROSES BROADCAST DIMULAI... Mohon tunggu.`, 'success');
@@ -230,13 +256,21 @@ export default function App() {
     };
 
     if (productForm.id) {
-      const { error } = await supabase.from('products').update(payload).eq('id', productForm.id);
+      const { error } = await supabase.from('products').update(payload).eq('id', productForm.id).select();
       if (error) showToast(error.message, 'error');
-      else { showToast('Produk Berhasil Diperbarui!'); fetchData(); setProductForm({ id: null, name: '', description: '', price: '', quota_turnitin: '', quota_ai: '' }); }
+      else { 
+        await fetchData(); 
+        showToast('Produk Berhasil Diperbarui!'); 
+        setProductForm({ id: null, name: '', description: '', price: '', quota_turnitin: '', quota_ai: '' }); 
+      }
     } else {
-      const { error } = await supabase.from('products').insert([payload]);
+      const { error } = await supabase.from('products').insert([payload]).select();
       if (error) showToast(error.message, 'error');
-      else { showToast('Produk Berhasil Ditambahkan!'); fetchData(); setProductForm({ id: null, name: '', description: '', price: '', quota_turnitin: '', quota_ai: '' }); }
+      else { 
+        await fetchData(); 
+        showToast('Produk Berhasil Ditambahkan!'); 
+        setProductForm({ id: null, name: '', description: '', price: '', quota_turnitin: '', quota_ai: '' }); 
+      }
     }
   };
 
@@ -244,7 +278,10 @@ export default function App() {
     showConfirm('Hapus produk ini secara permanen dari database?', async () => {
       const { error } = await supabase.from('products').delete().eq('id', id);
       if (error) showToast(error.message, 'error');
-      else { showToast('Produk Berhasil Dihapus!'); fetchData(); }
+      else { 
+        await fetchData(); 
+        showToast('Produk Berhasil Dihapus!'); 
+      }
     });
   };
 
@@ -281,6 +318,7 @@ export default function App() {
   return (
     <div className="flex h-screen bg-transparent font-sans text-gray-100 overflow-hidden relative">
       
+      {/* ---------------- MODAL INLINE ---------------- */}
       {toast.show && (
         <div className="fixed top-8 right-8 z-[100] animate-in slide-in-from-right fade-in duration-300">
           <div className={`flex items-center gap-3 px-6 py-4 rounded-xl backdrop-blur-xl border ${toast.type === 'error' ? 'bg-red-950/80 border-red-500/50 text-red-100 shadow-[0_0_20px_rgba(239,68,68,0.3)]' : 'bg-purple-900/80 border-purple-500/50 text-purple-100 shadow-[0_0_20px_rgba(168,85,247,0.3)]'}`}>
@@ -408,7 +446,7 @@ export default function App() {
             <div className="space-y-8 animate-in fade-in duration-500">
                <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-black tracking-tight uppercase text-white">Analitik Real-time</h2>
-                  <button onClick={() => { fetchData(); showToast('Sinkronisasi Data Berhasil', 'success'); }} className="p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-all text-purple-400"><RefreshCw size={18} className={loading?'animate-spin':''}/></button>
+                  <button onClick={async () => { await fetchData(); showToast('Sinkronisasi Data Berhasil', 'success'); }} className="p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-all text-purple-400"><RefreshCw size={18} className={loading?'animate-spin':''}/></button>
                </div>
 
                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -457,6 +495,8 @@ export default function App() {
               showToast={showToast} 
               showConfirm={showConfirm} 
               showPrompt={showPrompt} 
+              sendTgMessage={sendTgMessage}
+              sendTgDocument={sendTgDocument}
             />
           )}
 
@@ -654,7 +694,7 @@ function NavItem({ icon, label, active, onClick, open }) {
   );
 }
 
-// COMPONENT: TOPUP TAB (DIUBAH SESUAI PERMINTAAN TEPAT DARI BOSS JUY)
+// COMPONENT: TOPUP TAB (FIX ANTI BUG + EXACT FORMAT DARI BOSS JUY)
 function TopupTab({ topups, products, config, onUpdate, showToast, showConfirm, showPrompt }) {
   const [previewImg, setPreviewImg] = useState(null);
 
@@ -668,14 +708,15 @@ function TopupTab({ topups, products, config, onUpdate, showToast, showConfirm, 
         if (!reasonText) return;
         
         showConfirm(`Tolak transaksi ini dengan alasan: "${reasonText}"?`, async () => {
-          // Update status di Supabase
-          const { error } = await supabase.from('topups').update({ status, reject_reason: reasonText }).eq('id', id);
+          
+          // Fix React Stale Update pakai .select()
+          const { error } = await supabase.from('topups').update({ status, reject_reason: reasonText }).eq('id', id).select();
           
           if (error) {
             showToast(error.message, 'error');
           } else {
-            // KIRIM PESAN KE USER DENGAN KODE FETCH ASLI (EXACT MATCH)
-            if (config.bot_token) {
+            console.log("Menyiapkan pengiriman notif tolak. Token:", config?.bot_token);
+            if (config?.bot_token) {
               await fetch(`https://api.telegram.org/bot${config.bot_token}/sendMessage`, {
                 method: 'POST',
                 headers: {
@@ -687,8 +728,10 @@ function TopupTab({ topups, products, config, onUpdate, showToast, showConfirm, 
                 })
               }).catch(e => console.log(e));
             }
+            
+            // Fix Async Dashboard
+            await onUpdate(); 
             showToast('Transaksi ditolak dan notifikasi terkirim.', 'success'); 
-            onUpdate(); 
           }
         });
       });
@@ -697,14 +740,14 @@ function TopupTab({ topups, products, config, onUpdate, showToast, showConfirm, 
     // AKSI: ADMIN MENERIMA PEMBAYARAN TOP UP
     // ==========================================
     } else if (status === 'SUCCESS') {
+      console.log("Parameter Diterima:", status, telegram_id, package_name);
+      
       showConfirm(`Terima transaksi ini? Kuota akan otomatis bertambah ke akun user.`, async () => {
         
-        // 1. Cari produk untuk menambahkan kuota
         const matchProd = products.find(p => p.name === package_name);
         const addTurnitin = matchProd ? matchProd.quota_turnitin : 0;
         const addAi = matchProd ? matchProd.quota_ai : 0;
 
-        // 2. Update Kuota User
         const { data: user } = await supabase.from('users').select('quota_turnitin, quota_ai').eq('telegram_id', telegram_id).single();
         if (user) {
           const newTurnitin = (user.quota_turnitin || 0) + addTurnitin;
@@ -712,14 +755,14 @@ function TopupTab({ topups, products, config, onUpdate, showToast, showConfirm, 
           await supabase.from('users').update({ quota_turnitin: newTurnitin, quota_ai: newAi }).eq('telegram_id', telegram_id);
         }
 
-        // 3. Update status topup
-        const { error } = await supabase.from('topups').update({ status }).eq('id', id);
+        // Fix React Stale Update pakai .select()
+        const { error } = await supabase.from('topups').update({ status }).eq('id', id).select();
         
         if (error) {
           showToast(error.message, 'error');
         } else {
-          // 4. KIRIM PESAN SUKSES KE USER TANPA BERTANYA FILE (EXACT MATCH)
-          if (config.bot_token) {
+          console.log("Menyiapkan pengiriman notif terima. Token:", config?.bot_token);
+          if (config?.bot_token) {
             await fetch(`https://api.telegram.org/bot${config.bot_token}/sendMessage`, {
               method: 'POST',
               headers: {
@@ -731,8 +774,10 @@ function TopupTab({ topups, products, config, onUpdate, showToast, showConfirm, 
               })
             }).catch(e => console.log(e));
           }
+          
+          // Fix Async Dashboard
+          await onUpdate(); 
           showToast('Top Up diterima & Kuota bertambah!', 'success'); 
-          onUpdate(); 
         }
       });
     }
@@ -788,7 +833,8 @@ function TopupTab({ topups, products, config, onUpdate, showToast, showConfirm, 
   );
 }
 
-function OrdersTab({ orders, config, onUpdate, showToast, showConfirm, showPrompt }) {
+// COMPONENT: ANTREAN ORDER SERVIS (CEK FILE) FIX ASYNC & CONFIG
+function OrdersTab({ orders, config, onUpdate, showToast, showConfirm, showPrompt, sendTgMessage, sendTgDocument }) {
   const fileInputRef = useRef(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
@@ -797,23 +843,20 @@ function OrdersTab({ orders, config, onUpdate, showToast, showConfirm, showPromp
     if (!file || !selectedOrder) return;
     
     showConfirm(`Kirim file hasil cek (${file.name}) ke user ini?`, async () => {
-      await supabase.from('orders').update({ status: 'SUCCESS' }).eq('id', selectedOrder.id);
+      // Fix React Stale Update pakai .select()
+      await supabase.from('orders').update({ status: 'SUCCESS' }).eq('id', selectedOrder.id).select();
       
-      if (config.bot_token) {
-        const formData = new FormData();
-        formData.append('chat_id', selectedOrder.telegram_id);
-        formData.append('caption', `✅ *HASIL PENGECEKAN SELESAI*\n\nServis: ${selectedOrder.service_type}\nDetail: ${selectedOrder.details}\n\nTerima kasih telah menggunakan layanan Lila Store! 💜`);
-        formData.append('parse_mode', 'Markdown');
-        formData.append('document', file);
-
-        await fetch(`https://api.telegram.org/bot${config.bot_token}/sendDocument`, {
-          method: 'POST',
-          body: formData
-        }).catch(err => console.log(err));
+      const caption = `✅ *HASIL PENGECEKAN SELESAI*\n\nServis: ${selectedOrder.service_type}\nDetail: ${selectedOrder.details}\n\nTerima kasih telah menggunakan layanan Lila Store! 💜`;
+      
+      console.log("Kirim Dokumen. Token:", config?.bot_token);
+      if (config?.bot_token) {
+        await sendTgDocument(selectedOrder.telegram_id, caption, file, file.name);
       }
+      
+      // Fix Async Dashboard
+      await onUpdate();
       showToast('Hasil berhasil dikirim!', 'success');
       setSelectedOrder(null);
-      onUpdate();
     });
   };
 
@@ -827,10 +870,11 @@ function OrdersTab({ orders, config, onUpdate, showToast, showConfirm, showPromp
            await supabase.from('users').update({ [key]: user[key] + 1 }).eq('telegram_id', order.telegram_id);
          }
 
-         await supabase.from('orders').update({ status: 'REJECTED', reject_reason: reasonText }).eq('id', order.id);
+         // Fix React Stale Update pakai .select()
+         await supabase.from('orders').update({ status: 'REJECTED', reject_reason: reasonText }).eq('id', order.id).select();
          
-         // TAMBAHAN FETCH EXPLICIT UNTUK REFUND
-         if (config.bot_token) {
+         console.log("Kirim Notif Refund. Token:", config?.bot_token);
+         if (config?.bot_token) {
             await fetch(`https://api.telegram.org/bot${config.bot_token}/sendMessage`, {
               method: 'POST',
               headers: {
@@ -843,8 +887,9 @@ function OrdersTab({ orders, config, onUpdate, showToast, showConfirm, showPromp
             }).catch(e => console.log(e));
          }
          
+         // Fix Async Dashboard
+         await onUpdate();
          showToast('Ditolak & Kuota kembali.', 'success'); 
-         onUpdate();
       });
     });
   };
@@ -886,18 +931,21 @@ function OrdersTab({ orders, config, onUpdate, showToast, showConfirm, showPromp
   );
 }
 
+// COMPONENT DATA PELANGGAN FIX ASYNC
 function CustomerTab({ users, onUpdate, showToast, showConfirm, showPrompt }) {
   const handleQuota = (tid, type) => {
     showPrompt(`Update Kuota ${type}`, "Masukkan jumlah kuota baru (angka)", "number", (newVal) => {
       if (!newVal || isNaN(newVal)) return;
       showConfirm(`Simpan perubahan kuota menjadi ${newVal}?`, async () => {
         const key = type === 'Turnitin' ? 'quota_turnitin' : 'quota_ai';
-        const { error } = await supabase.from('users').update({ [key]: parseInt(newVal) }).eq('telegram_id', tid);
+        // Fix React Stale Update pakai .select()
+        const { error } = await supabase.from('users').update({ [key]: parseInt(newVal) }).eq('telegram_id', tid).select();
+        
         if(error) {
           showToast('Gagal mengubah kuota', 'error');
         } else {
+          await onUpdate(); 
           showToast(`Kuota ${type} diperbarui.`, 'success'); 
-          onUpdate(); 
         }
       });
     });
@@ -905,9 +953,9 @@ function CustomerTab({ users, onUpdate, showToast, showConfirm, showPrompt }) {
 
   const handleBan = (tid, current) => {
     showConfirm(`Ubah status akses pengguna ini?`, async () => {
-      await supabase.from('users').update({ is_banned: !current }).eq('telegram_id', tid);
+      await supabase.from('users').update({ is_banned: !current }).eq('telegram_id', tid).select();
+      await onUpdate();
       showToast(`Status Firewall pengguna diupdate.`, 'success');
-      onUpdate();
     });
   };
 
