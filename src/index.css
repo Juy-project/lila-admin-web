@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body { 
+  background-color: #050505;
+  /* Gradasi Cyberpunk Smooth tanpa Grid */
+  background: radial-gradient(circle at top left, #1a0b2e, #050505 60%),
+              radial-gradient(circle at bottom right, #2d0b2e, #050505 60%);
+  background-attachment: fixed;
+  color: white;
+  min-height: 100vh;
+}
+
+/* Scrollbar Neon */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #050505; }
+::-webkit-scrollbar-thumb { background: #8b5cf6; border-radius: 10px; }
