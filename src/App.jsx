@@ -17,6 +17,8 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [broadcastLoading, setBroadcastLoading] = useState(false);
+
   
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' });
   const [dialog, setDialog] = useState({ show: false, msg: '', onConfirm: null });
@@ -149,7 +151,7 @@ export default function App() {
     });
     setTrends(trendData); setLoading(false);
   };
-  
+
   const handleLogin = async (e) => {
     e.preventDefault();
     if ((loginData.id == config.owner_id && loginData.pass == config.password) || (loginData.id === '7475939789' && loginData.pass === 'masuk123')) {
@@ -184,40 +186,137 @@ export default function App() {
     else { await fetchData(); showToast('PENGATURAN DISIMPAN!', 'success'); setShowProfileModal(false); }
   };
 
-  const handleSendBroadcast = async () => {
-    if (!bcMsg) return showToast('Isi pesan broadcast terlebih dahulu!', 'error');
-    if (!config?.bot_token) return showToast('Token Bot belum diisi di Pengaturan!', 'error');
+const handleSendBroadcast = async () => {
 
-    showConfirm(`Kirim broadcast ke ${users.length} pengguna aktif sekarang?`, async () => {
-      showToast(`PROSES BROADCAST DIMULAI... Mohon tunggu.`, 'success');
-      let successCount = 0;
-      for (const u of users) {
-        try {
-          if (bcImg) {
-             const formData = new FormData();
-             formData.append('chat_id', String(u.telegram_id));
-             formData.append('caption', bcMsg);
-             formData.append('parse_mode', 'Markdown');
-             
-             // Convert base64 img to Blob to send via Telegram
-             const res = await fetch(bcImg);
-             const blob = await res.blob();
-             formData.append('photo', blob, 'broadcast.jpg');
-             await fetch(`https://api.telegram.org/bot${config.bot_token}/sendPhoto`, { method: 'POST', body: formData });
-          } else {
-             await fetch(`https://api.telegram.org/bot${config.bot_token}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: String(u.telegram_id), text: bcMsg, parse_mode: 'Markdown' })
-             });
+  // ANTI DOUBLE CLICK
+  if (broadcastLoading) return;
+
+  if (!bcMsg)
+    return showToast(
+      'Isi pesan broadcast terlebih dahulu!',
+      'error'
+    );
+
+  if (!config?.bot_token)
+    return showToast(
+      'Token Bot belum diisi di Pengaturan!',
+      'error'
+    );
+
+  showConfirm(
+    `Kirim broadcast ke ${users.length} pengguna aktif sekarang?`,
+    async () => {
+
+      try {
+
+        // LOCK BUTTON
+        setBroadcastLoading(true);
+
+        showToast(
+          `PROSES BROADCAST DIMULAI... Mohon tunggu.`,
+          'success'
+        );
+
+        let successCount = 0;
+
+        for (const u of users) {
+
+          try {
+
+            if (bcImg) {
+
+              const formData =
+                new FormData();
+
+              formData.append(
+                'chat_id',
+                String(u.telegram_id)
+              );
+
+              formData.append(
+                'caption',
+                bcMsg
+              );
+
+              formData.append(
+                'parse_mode',
+                'Markdown'
+              );
+
+              // Convert base64 image to Blob
+              const res =
+                await fetch(bcImg);
+
+              const blob =
+                await res.blob();
+
+              formData.append(
+                'photo',
+                blob,
+                'broadcast.jpg'
+              );
+
+              await fetch(
+                `https://api.telegram.org/bot${config.bot_token}/sendPhoto`,
+                {
+                  method: 'POST',
+                  body: formData
+                }
+              );
+
+            } else {
+
+              await fetch(
+                `https://api.telegram.org/bot${config.bot_token}/sendMessage`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type':
+                      'application/json'
+                  },
+                  body: JSON.stringify({
+                    chat_id: String(
+                      u.telegram_id
+                    ),
+                    text: bcMsg,
+                    parse_mode: 'Markdown'
+                  })
+                }
+              );
+            }
+
+            successCount++;
+
+          } catch (e) {
+
+            console.log(
+              'Broadcast error:',
+              e
+            );
           }
-          successCount++;
-        } catch(e) { console.log('Broadcast error:', e); }
+        }
+
+        showToast(
+          `BROADCAST SELESAI! Terkirim ke ${successCount} user.`,
+          'success'
+        );
+
+        // RESET FORM
+        setBcMsg('');
+        setBcImg('');
+
+      } finally {
+
+        // BUKA LOCK LAGI
+        setBroadcastLoading(false);
+
+        // TUTUP POPUP CONFIRM
+        closeConfirm();
       }
-      showToast(`BROADCAST SELESAI! Terkirim ke ${successCount} user.`, 'success');
-      setBcMsg(''); setBcImg('');
-    });
-  };
+    }
+  );
+};
+
 
   const handleSaveProduct = async (e) => {
     e.preventDefault();
@@ -350,7 +449,7 @@ export default function App() {
         </header>
 
         <main className="flex-1 overflow-y-auto p-8">
-          
+    
           {/* --- TAB DASHBOARD --- */}
           {activeTab === 'dashboard' && (
              <div className="space-y-8 animate-in fade-in">
@@ -464,8 +563,7 @@ export default function App() {
                     </div>
                   )}
                 </div>
-                <button onClick={handleSendBroadcast} className="w-full bg-purple-600 hover:bg-purple-500 py-4 rounded-xl text-xs font-black uppercase tracking-widest text-white shadow-lg transition-all active:scale-95">KIRIM BROADCAST SEKARANG</button>
-              </div>
+              <button onClick={handleSendBroadcast} disabled={broadcastLoading} className={`w-full py-4 rounded-xl text-xs font-black uppercase tracking-widest text-white shadow-lg transition-all active:scale-95 ${ broadcastLoading ? 'bg-gray-700 cursor-not-allowed opacity-60' : 'bg-purple-600 hover:bg-purple-500' }`} > {broadcastLoading ? 'MENGIRIM BROADCAST...' : 'KIRIM BROADCAST SEKARANG'} </button>              </div>
             </div>
           )}
 
