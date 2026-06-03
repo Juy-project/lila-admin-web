@@ -138,19 +138,90 @@ export default function App() {
     
     if (u) setUsers(u); if (c) setConfig(c); if (t) setTopups(t); if (p) setProducts(p); if (o) setOrders(o);
     
-    // Hitung data untuk chart
-    const days = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
-    const trendData = days.map(day => ({ name: day, users: 0, pending: 0, success: 0, revenue: 0 }));
-    t?.forEach(item => {
-      if(item.created_at) {
-        const d = new Date(item.created_at).getDay();
-        const idx = d === 0 ? 6 : d - 1; 
-        if (item.status === 'PENDING') trendData[idx].pending += 1;
-        if (item.status === 'SUCCESS') { trendData[idx].success += 1; trendData[idx].revenue += (item.amount || 0); }
-      }
-    });
-    setTrends(trendData); setLoading(false);
-  };
+// Hitung data untuk chart
+const days = [
+  'Sen',
+  'Sel',
+  'Rab',
+  'Kam',
+  'Jum',
+  'Sab',
+  'Min'
+];
+
+const trendData =
+  days.map(day => ({
+    name: day,
+    users: 0,
+    pending: 0,
+    success: 0,
+    revenue: 0
+  }));
+
+// =========================================
+// DATA TOPUP
+// =========================================
+t?.forEach(item => {
+
+  if (item.created_at) {
+
+    const d =
+      new Date(
+        item.created_at
+      ).getDay();
+
+    const idx =
+      d === 0
+        ? 6
+        : d - 1;
+
+    // PENDING
+    if (
+      item.status === 'PENDING'
+    ) {
+
+      trendData[idx].pending += 1;
+    }
+
+    // SUCCESS
+    if (
+      item.status === 'SUCCESS'
+    ) {
+
+      trendData[idx].success += 1;
+
+      trendData[idx].revenue +=
+        (item.amount || 0);
+    }
+  }
+});
+
+// =========================================
+// DATA USER
+// =========================================
+u?.forEach(item => {
+
+  if (item.created_at) {
+
+    const d =
+      new Date(
+        item.created_at
+      ).getDay();
+
+    const idx =
+      d === 0
+        ? 6
+        : d - 1;
+
+    trendData[idx].users += 1;
+  }
+});
+
+setTrends(trendData);
+
+setLoading(false);
+
+};
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -336,25 +407,120 @@ const handleSendBroadcast = async () => {
     showConfirm('Hapus produk ini?', async () => { await supabase.from('products').delete().eq('id', id); await fetchData(); showToast('Produk Dihapus!'); });
   };
 
-  // ==========================================
-  // RENDER PUSAT
-  // ==========================================
-  if (!isLoggedIn) {
+// ==========================================
+// RENDER PUSAT
+// ==========================================
+
+if (!isLoggedIn) {
+
+  return (
+
+    <div className="h-screen w-full flex items-center justify-center font-mono p-4 bg-[#050505] relative overflow-hidden">
+
+      {toast.show && (
+        <div className="fixed top-8 right-8 z-[100] bg-purple-900 border border-purple-500 p-4 rounded-xl shadow-lg text-white font-bold">
+          {toast.msg}
+        </div>
+      )}
+
+      <div className="absolute w-96 h-96 bg-purple-600/10 blur-[120px] rounded-full top-0 left-0"></div>
+
+      <form
+        onSubmit={handleLogin}
+        className="w-full max-w-md bg-black/40 border border-purple-500/30 p-8 rounded-2xl relative z-10"
+      >
+
+        <h1 className="text-2xl font-black text-center mb-8 text-purple-400">
+          LILA ACCESS
+        </h1>
+
+        <div className="space-y-6">
+
+          <input
+            required
+            type="text"
+            className="w-full bg-white/5 p-4 rounded-xl text-white outline-none focus:border-purple-500 transition-all border border-transparent"
+            placeholder="ID Telegram Owner"
+            onChange={e =>
+              setLoginData({
+                ...loginData,
+                id: e.target.value
+              })
+            }
+          />
+
+          <input
+            required
+            type="password"
+            className="w-full bg-white/5 p-4 rounded-xl text-white outline-none focus:border-purple-500 transition-all border border-transparent"
+            placeholder="Password Sistem"
+            onChange={e =>
+              setLoginData({
+                ...loginData,
+                pass: e.target.value
+              })
+            }
+          />
+
+          <button className="w-full bg-purple-600 py-4 rounded-xl font-bold text-white uppercase hover:shadow-[0_0_20px_#8b5cf6]">
+            AUTHORIZE LOGIN
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+  );
+}
+
+// =========================================
+// REALTIME MONTHLY REVENUE
+// =========================================
+
+const currentMonth =
+  new Date().getMonth();
+
+const currentYear =
+  new Date().getFullYear();
+
+// TOPUP BULAN INI
+const monthlyTopups =
+  topups.filter(t => {
+
+    if (
+      t.status !== 'SUCCESS' ||
+      !t.created_at
+    ) return false;
+
+    const d =
+      new Date(t.created_at);
+
     return (
-      <div className="h-screen w-full flex items-center justify-center font-mono p-4 bg-[#050505] relative overflow-hidden">
-        {toast.show && <div className="fixed top-8 right-8 z-[100] bg-purple-900 border border-purple-500 p-4 rounded-xl shadow-lg text-white font-bold">{toast.msg}</div>}
-        <div className="absolute w-96 h-96 bg-purple-600/10 blur-[120px] rounded-full top-0 left-0"></div>
-        <form onSubmit={handleLogin} className="w-full max-w-md bg-black/40 border border-purple-500/30 p-8 rounded-2xl relative z-10">
-          <h1 className="text-2xl font-black text-center mb-8 text-purple-400">LILA ACCESS</h1>
-          <div className="space-y-6">
-            <input required type="text" className="w-full bg-white/5 p-4 rounded-xl text-white outline-none focus:border-purple-500 transition-all border border-transparent" placeholder="ID Telegram Owner" onChange={e => setLoginData({...loginData, id: e.target.value})} />
-            <input required type="password" className="w-full bg-white/5 p-4 rounded-xl text-white outline-none focus:border-purple-500 transition-all border border-transparent" placeholder="Password Sistem" onChange={e => setLoginData({...loginData, pass: e.target.value})} />
-            <button className="w-full bg-purple-600 py-4 rounded-xl font-bold text-white uppercase hover:shadow-[0_0_20px_#8b5cf6]">AUTHORIZE LOGIN</button>
-          </div>
-        </form>
-      </div>
+      d.getMonth() === currentMonth &&
+      d.getFullYear() === currentYear
     );
-  }
+  });
+
+// PENDAPATAN BULAN INI
+const monthlyRevenue =
+  monthlyTopups.reduce(
+    (a, c) =>
+      a + (c.amount || 0),
+    0
+  );
+
+// TOTAL PENDAPATAN
+const totalRevenue =
+  topups
+    .filter(
+      t => t.status === 'SUCCESS'
+    )
+    .reduce(
+      (a, c) =>
+        a + (c.amount || 0),
+      0
+    );
 
   return (
     <div className="flex h-screen bg-[#050505] font-sans text-gray-100 overflow-hidden relative">
@@ -450,31 +616,140 @@ const handleSendBroadcast = async () => {
 
         <main className="flex-1 overflow-y-auto p-8">
     
-          {/* --- TAB DASHBOARD --- */}
-          {activeTab === 'dashboard' && (
-             <div className="space-y-8 animate-in fade-in">
-               <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-black uppercase text-white">Analitik Real-time</h2>
-                  <button onClick={async () => { await fetchData(); showToast('Sinkronisasi Berhasil', 'success'); }} className="p-2 bg-white/5 rounded-lg text-purple-400 hover:bg-white/10 transition-all"><RefreshCw size={18} className={loading?'animate-spin':''}/></button>
-               </div>
-               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <StatCard title="Total Pelanggan" val={users.length} color="border-purple-500" onClick={() => setActiveChart('users')} />
-                  <StatCard title="Top Up Pending" val={topups.filter(t=>t.status==='PENDING').length} color="border-yellow-500" onClick={() => setActiveChart('pending')} />
-                  <StatCard title="Transaksi Selesai" val={topups.filter(t=>t.status==='SUCCESS').length} color="border-green-500" onClick={() => setActiveChart('success')} />
-                  <StatCard title="Omset (IDR)" val={`Rp ${topups.filter(t=>t.status==='SUCCESS').reduce((a,c)=>a+(c.amount||0), 0).toLocaleString()}`} color="border-fuchsia-500" onClick={() => setActiveChart('revenue')} />
-               </div>
-               <div className="bg-white/5 border border-white/10 p-6 rounded-2xl h-80 shadow-xl">
-                  <h3 className="mb-4 font-bold text-purple-400 capitalize flex items-center gap-2"><TrendingUp size={18}/> {activeChart} Chart</h3>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={trends}>
-                      <XAxis dataKey="name" stroke="#666" />
-                      <Tooltip contentStyle={{background: '#0a0a0f', border: '1px solid #333'}} />
-                      <Area type="monotone" dataKey={activeChart} stroke="#8b5cf6" fillOpacity={0.2} strokeWidth={3} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-               </div>
-             </div>
-          )}
+{/* --- TAB DASHBOARD --- */}
+{activeTab === 'dashboard' && (
+
+  <div className="space-y-8 animate-in fade-in">
+
+    <div className="flex items-center justify-between">
+
+      <h2 className="text-2xl font-black uppercase text-white">
+        Analitik Real-time
+      </h2>
+
+      <button
+        onClick={async () => {
+          await fetchData();
+
+          showToast(
+            'Sinkronisasi Berhasil',
+            'success'
+          );
+        }}
+        className="p-2 bg-white/5 rounded-lg text-purple-400 hover:bg-white/10 transition-all"
+      >
+        <RefreshCw
+          size={18}
+          className={
+            loading
+              ? 'animate-spin'
+              : ''
+          }
+        />
+      </button>
+
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+
+      <StatCard
+        title="Total Pelanggan"
+        val={users.length}
+        color="border-purple-500"
+        onClick={() =>
+          setActiveChart('users')
+        }
+      />
+
+      <StatCard
+        title="Top Up Pending"
+        val={
+          topups.filter(
+            t => t.status === 'PENDING'
+          ).length
+        }
+        color="border-yellow-500"
+        onClick={() =>
+          setActiveChart('pending')
+        }
+      />
+
+      <StatCard
+        title="Transaksi Selesai"
+        val={
+          topups.filter(
+            t => t.status === 'SUCCESS'
+          ).length
+        }
+        color="border-green-500"
+        onClick={() =>
+          setActiveChart('success')
+        }
+      />
+
+      <StatCard
+        title="Pendapatan Bulan Ini"
+        val={`Rp ${monthlyRevenue.toLocaleString()}`}
+        color="border-cyan-500"
+        onClick={() =>
+          setActiveChart('revenue')
+        }
+      />
+
+      <StatCard
+        title="Total Pendapatan"
+        val={`Rp ${totalRevenue.toLocaleString()}`}
+        color="border-fuchsia-500"
+        onClick={() =>
+          setActiveChart('revenue')
+        }
+      />
+
+    </div>
+
+    <div className="bg-white/5 border border-white/10 p-6 rounded-2xl h-80 shadow-xl">
+
+      <h3 className="mb-4 font-bold text-purple-400 capitalize flex items-center gap-2">
+        <TrendingUp size={18}/>
+        {activeChart} Chart
+      </h3>
+
+      <ResponsiveContainer
+        width="100%"
+        height="100%"
+      >
+
+        <AreaChart data={trends}>
+
+          <XAxis
+            dataKey="name"
+            stroke="#666"
+          />
+
+          <Tooltip
+            contentStyle={{
+              background: '#0a0a0f',
+              border: '1px solid #333'
+            }}
+          />
+
+          <Area
+            type="monotone"
+            dataKey={activeChart}
+            stroke="#8b5cf6"
+            fillOpacity={0.2}
+            strokeWidth={3}
+          />
+
+        </AreaChart>
+
+      </ResponsiveContainer>
+
+    </div>
+
+  </div>
+
+)}
 
           {/* --- TAB LAIN-LAIN --- */}
           {activeTab === 'topup' && <TopupTab topups={topups} products={products} onUpdate={fetchData} showToast={showToast} showConfirm={showConfirm} showPrompt={showPrompt} sendTgMessage={sendTgMessage} supabase={supabase} />}
