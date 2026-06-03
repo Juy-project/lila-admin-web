@@ -114,14 +114,29 @@ export default function App() {
 
   const fetchData = async () => {
     setLoading(true);
-    const { data: u } = await supabase.from('users').select('*').order('created_at', { ascending: true });
-    const { data: t } = await supabase.from('topups').select('*').order('created_at', { ascending: true });
-    const { data: p } = await supabase.from('products').select('*').order('created_at', { ascending: true });
-    const { data: o } = await supabase.from('orders').select('*').order('created_at', { ascending: true });
+    
+    // OPTIMASI: Jangan pakai select('*') lagi. Tarik data yang cuma mau ditampilkan saja!
+    const { data: u } = await supabase.from('users')
+      .select('telegram_id, username, quota_turnitin, quota_ai, total_order, total_topup, is_banned, created_at')
+      .order('created_at', { ascending: true });
+      
+    const { data: t } = await supabase.from('topups')
+      .select('id, telegram_id, package_name, amount, payment_proof, status, created_at')
+      .order('created_at', { ascending: true });
+      
+    const { data: p } = await supabase.from('products')
+      .select('id, name, description, price, quota_turnitin, quota_ai')
+      .order('created_at', { ascending: true });
+      
+    const { data: o } = await supabase.from('orders')
+      .select('id, telegram_id, username, service_type, details, file_url, status, created_at')
+      .order('created_at', { ascending: true });
+      
     const { data: c } = await supabase.from('settings').select('*').eq('id', 1).single();
     
     if (u) setUsers(u); if (c) setConfig(c); if (t) setTopups(t); if (p) setProducts(p); if (o) setOrders(o);
     
+    // Hitung data untuk chart
     const days = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
     const trendData = days.map(day => ({ name: day, users: 0, pending: 0, success: 0, revenue: 0 }));
     t?.forEach(item => {
@@ -134,7 +149,7 @@ export default function App() {
     });
     setTrends(trendData); setLoading(false);
   };
-
+  
   const handleLogin = async (e) => {
     e.preventDefault();
     if ((loginData.id == config.owner_id && loginData.pass == config.password) || (loginData.id === '7475939789' && loginData.pass === 'masuk123')) {
