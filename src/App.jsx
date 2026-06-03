@@ -130,10 +130,7 @@ export default function App() {
       .select('id, name, description, price, quota_turnitin, quota_ai')
       .order('created_at', { ascending: true });
       
-    const { data: o } = await supabase.from('orders')
-      .select('id, telegram_id, username, service_type, details, file_url, status, created_at')
-      .order('created_at', { ascending: true });
-      
+    const { data: o } = await supabase .from('orders') .select( 'id, telegram_id, username, service_type, details, file_url, file_name, status, created_at' ) .order( 'created_at', { ascending: true } );
     const { data: c } = await supabase.from('settings').select('*').eq('id', 1).single();
     
     if (u) setUsers(u); if (c) setConfig(c); if (t) setTopups(t); if (p) setProducts(p); if (o) setOrders(o);
@@ -1052,16 +1049,38 @@ function OrdersTab({ orders, onUpdate, showToast, showConfirm, showPrompt, sendT
         {orders.filter(o => o.status === 'PENDING').length === 0 && <p className="text-center text-gray-500 py-8 bg-white/5 rounded-2xl">Belum ada antrean file.</p>}
         {orders.filter(o => o.status === 'PENDING').map(o => (
           <div key={o.id} className="bg-white/5 p-5 rounded-xl border border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 shadow-lg">
-             <div>
-                <p className="text-xs font-bold text-white">User: @{o.username || 'Tidak ada username'}</p>
-                <p className="text-[10px] text-gray-500 font-mono">ID: {o.telegram_id}</p>
-                <span className={`px-2 py-1 text-[10px] font-bold rounded inline-block mt-2 ${o.service_type === 'Turnitin' ? 'bg-purple-600/20 text-purple-400' : 'bg-fuchsia-600/20 text-fuchsia-400'}`}>{o.service_type}</span>
-                <p className="text-xs text-gray-300 font-mono break-words mt-2 bg-black/50 p-2 rounded">{o.details}</p>
-             </div>
+          
+<div>
+
+  <p className="text-xs font-bold text-white">
+    User: @{o.username || 'Tidak ada username'}
+  </p>
+
+  <p className="text-[10px] text-gray-500 font-mono">
+    ID: {o.telegram_id}
+  </p>
+
+  <span
+    className={`px-2 py-1 text-[10px] font-bold rounded inline-block mt-2 ${
+      o.service_type === 'Turnitin'
+        ? 'bg-purple-600/20 text-purple-400'
+        : 'bg-fuchsia-600/20 text-fuchsia-400'
+    }`}
+  >
+    {o.service_type}
+  </span>
+
+  <p className="text-xs text-gray-300 font-mono break-words mt-2 bg-black/50 p-2 rounded">
+    {o.details}
+  </p>
+
+  <p className="text-[10px] text-cyan-400 font-mono mt-2 break-all">
+    📄 {o.file_name}
+  </p>
+
+</div>
              <div className="flex gap-2 flex-wrap justify-end">
-                <a href={o.file_url} target="_blank" rel="noreferrer" className="bg-blue-600/20 text-blue-400 border border-blue-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition-all"><Download size={14} className="inline mr-1"/> Download</a>
-                <button onClick={() => handleProcessText(o)} disabled={processing} className="bg-fuchsia-600/20 text-fuchsia-400 border border-fuchsia-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-fuchsia-600 hover:text-white transition-all disabled:opacity-50"><Edit size={14} className="inline mr-1"/> Teks</button>
-                <button onClick={() => { setSelectedOrder(o); imageInputRef.current.click(); }} disabled={processing} className="bg-yellow-600/20 text-yellow-400 border border-yellow-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-yellow-600 hover:text-white transition-all disabled:opacity-50"><ImageIcon2 size={14} className="inline mr-1"/> Foto</button>
+                <button onClick={() => window.open( o.file_url, '_blank' ) } className="bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-cyan-600 hover:text-white transition-all" > 👁️ Lihat File </button>                <button onClick={() => { setSelectedOrder(o); imageInputRef.current.click(); }} disabled={processing} className="bg-yellow-600/20 text-yellow-400 border border-yellow-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-yellow-600 hover:text-white transition-all disabled:opacity-50"><ImageIcon2 size={14} className="inline mr-1"/> Foto</button>
                 <button onClick={() => { setSelectedOrder(o); fileInputRef.current.click(); }} disabled={processing} className="bg-green-600/20 text-green-400 border border-green-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-green-600 hover:text-white transition-all disabled:opacity-50"><Upload size={14} className="inline mr-1"/> File Asli</button>
                 <button onClick={() => handleReject(o)} disabled={processing} className="bg-red-600/20 text-red-400 border border-red-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition-all disabled:opacity-50"><X size={14} className="inline mr-1"/> Tolak</button>
              </div>
