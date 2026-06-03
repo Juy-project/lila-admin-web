@@ -1079,11 +1079,11 @@ function OrdersTab({ orders, onUpdate, showToast, showConfirm, showPrompt, sendT
   </p>
 
 </div>
-             <div className="flex gap-2 flex-wrap justify-end">
-                <a href={encodeURI(o.file_url)} target="_blank" rel="noopener noreferrer" className="bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-cyan-600 hover:text-white transition-all" > 👁️ Lihat File </a>
-                <button onClick={() => { setSelectedOrder(o); fileInputRef.current.click(); }} disabled={processing} className="bg-green-600/20 text-green-400 border border-green-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-green-600 hover:text-white transition-all disabled:opacity-50"><Upload size={14} className="inline mr-1"/> File Asli</button>
-                <button onClick={() => handleReject(o)} disabled={processing} className="bg-red-600/20 text-red-400 border border-red-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition-all disabled:opacity-50"><X size={14} className="inline mr-1"/> Tolak</button>
-             </div>
+             <div className="flex gap-2 flex-wrap justify-end"> <a href={encodeURI(o.file_url)} target="_blank" rel="noopener noreferrer" className="bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-cyan-600 hover:text-white transition-all" > 👁️ Lihat File </a>
+             <button onClick={() => handleProcessText(o)} disabled={processing} className="bg-fuchsia-600/20 text-fuchsia-400 border border-fuchsia-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-fuchsia-600 hover:text-white transition-all disabled:opacity-50" > <Edit size={14} className="inline mr-1" /> Teks </button> 
+             <button onClick={() => { setSelectedOrder(o); imageInputRef.current.click(); }} disabled={processing} className="bg-yellow-600/20 text-yellow-400 border border-yellow-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-yellow-600 hover:text-white transition-all disabled:opacity-50" > <ImageIcon2 size={14} className="inline mr-1" /> Foto </button> 
+             <button onClick={() => { setSelectedOrder(o); fileInputRef.current.click(); }} disabled={processing} className="bg-green-600/20 text-green-400 border border-green-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-green-600 hover:text-white transition-all disabled:opacity-50" > <Upload size={14} className="inline mr-1" /> File Asli </button> 
+             <button onClick={() => handleReject(o)} disabled={processing} className="bg-red-600/20 text-red-400 border border-red-500/30 px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white transition-all disabled:opacity-50" > <X size={14} className="inline mr-1" /> Tolak </button> </div>
           </div>
         ))}
       </div>
