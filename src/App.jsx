@@ -34,7 +34,7 @@ export default function App() {
   const [bcImg, setBcImg] = useState('');
   const [trends, setTrends] = useState([]);
 
-  const [productForm, setProductForm] = useState({ id: null, name: '', description: '', price: '', quota_turnitin: '', quota_ai: '' });
+const [productForm, setProductForm] = useState({ id: null, name: '', description: '', price: '', stock: '', quota_turnitin: '', quota_ai: '' });
 
   const showToast = (msg, type = 'success') => { setToast({ show: true, msg, type }); setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 3000); };
   const showConfirm = (msg, onConfirmCallback) => setDialog({ show: true, msg, onConfirm: onConfirmCallback });
@@ -126,8 +126,8 @@ export default function App() {
       .select('id, telegram_id, package_name, amount, payment_proof, status, created_at')
       .order('created_at', { ascending: true });
       
-    const { data: p } = await supabase.from('products')
-      .select('id, name, description, price, quota_turnitin, quota_ai')
+   const { data: p } = await supabase.from('products')
+      .select('id, name, description, price, quota_turnitin, quota_ai, stock') 
       .order('created_at', { ascending: true });
       
     const { data: o } = await supabase .from('orders') .select( 'id, telegram_id, username, service_type, details, file_url, file_name, status, created_at' ) .order( 'created_at', { ascending: true } );
@@ -753,14 +753,37 @@ const totalRevenue =
           {activeTab === 'orders' && <OrdersTab orders={orders} onUpdate={fetchData} showToast={showToast} showConfirm={showConfirm} showPrompt={showPrompt} sendTgMessage={sendTgMessage} sendTgDocument={sendTgDocument} sendTgPhoto={sendTgPhoto} supabase={supabase} />}
           {activeTab === 'customers' && <CustomerTab users={users} onUpdate={fetchData} showToast={showToast} showConfirm={showConfirm} showPrompt={showPrompt} supabase={supabase} />}
 
-          {/* --- TAB PRODUK --- */}
+         {/* --- TAB PRODUK --- */}
           {activeTab === 'products' && (
             <div className="space-y-8 animate-in fade-in">
-               <h2 className="text-xl font-black uppercase text-white flex items-center gap-2"><Package className="text-purple-400"/> Manajemen Produk</h2>
+               <h2 className="text-xl font-black uppercase text-white flex items-center gap-2"><Package className="text-purple-400"/> Manajemen Produk & Stok</h2>
                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div className="col-span-1 bg-white/5 p-6 rounded-2xl h-fit border border-white/10">
                      <h3 className="text-sm font-mono text-purple-400 mb-4 uppercase tracking-widest"><Plus size={16} className="inline mr-2"/> {productForm.id ? 'Edit Produk' : 'Tambah Produk Baru'}</h3>
-                     <form onSubmit={handleSaveProduct} className="space-y-4">
+                     
+                     <form onSubmit={async (e) => {
+                       e.preventDefault();
+                       if (!productForm.name || !productForm.price) return showToast('Nama & Harga wajib diisi!', 'error');
+                       
+                       // PASTIKAN STOCK DIKIRIM KE SUPABASE
+                       const payload = { 
+                         name: productForm.name, 
+                         description: productForm.description, 
+                         price: parseInt(productForm.price), 
+                         stock: parseInt(productForm.stock || 0), // Default stok = 0 kalau kosong
+                         quota_turnitin: parseInt(productForm.quota_turnitin || 0), 
+                         quota_ai: parseInt(productForm.quota_ai || 0) 
+                       };
+                       
+                       if (productForm.id) {
+                         const { error } = await supabase.from('products').update(payload).eq('id', productForm.id).select();
+                         if (!error) { await fetchData(); showToast('Produk & Stok Diperbarui!'); setProductForm({ id: null, name: '', description: '', price: '', stock: '', quota_turnitin: '', quota_ai: '' }); }
+                       } else {
+                         const { error } = await supabase.from('products').insert([payload]).select();
+                         if (!error) { await fetchData(); showToast('Produk Ditambahkan!'); setProductForm({ id: null, name: '', description: '', price: '', stock: '', quota_turnitin: '', quota_ai: '' }); }
+                       }
+                     }} className="space-y-4">
+                     
                         <div>
                           <label className="text-[9px] text-gray-400 font-mono">NAMA PAKET</label>
                           <input className="w-full bg-black/40 p-3 rounded-xl text-xs text-white outline-none focus:border-purple-500 border border-transparent" value={productForm.name} onChange={e => setProductForm({...productForm, name: e.target.value})} placeholder="Contoh: Paket Turnitin" />
@@ -769,10 +792,19 @@ const totalRevenue =
                           <label className="text-[9px] text-gray-400 font-mono">DESKRIPSI (Tampil di Bot)</label>
                           <textarea className="w-full bg-black/40 p-3 rounded-xl text-xs text-white min-h-[80px] outline-none focus:border-purple-500 border border-transparent" value={productForm.description} onChange={e => setProductForm({...productForm, description: e.target.value})} placeholder="Deskripsi paket..." />
                         </div>
-                        <div>
-                          <label className="text-[9px] text-gray-400 font-mono">HARGA (Rp)</label>
-                          <input className="w-full bg-black/40 p-3 rounded-xl text-xs text-white outline-none focus:border-purple-500 border border-transparent" type="number" value={productForm.price} onChange={e => setProductForm({...productForm, price: e.target.value})} placeholder="5000" />
+                        
+                        {/* KOTAK HARGA DAN STOK DIBUAT SEJAJAR BIAR RAPI */}
+                        <div className="flex gap-2">
+                           <div className="flex-[2]">
+                             <label className="text-[9px] text-gray-400 font-mono">HARGA (Rp)</label>
+                             <input className="w-full bg-black/40 p-3 rounded-xl text-xs text-white outline-none focus:border-purple-500 border border-transparent" type="number" value={productForm.price} onChange={e => setProductForm({...productForm, price: e.target.value})} placeholder="5000" />
+                           </div>
+                           <div className="flex-1">
+                             <label className="text-[9px] text-cyan-400 font-bold font-mono">STOK BARANG</label>
+                             <input className="w-full bg-cyan-900/20 p-3 rounded-xl text-xs text-cyan-400 font-bold outline-none focus:border-cyan-500 border border-cyan-500/30" type="number" value={productForm.stock} onChange={e => setProductForm({...productForm, stock: e.target.value})} placeholder="0" />
+                           </div>
                         </div>
+
                         <div className="flex gap-2">
                            <div className="flex-1">
                              <label className="text-[9px] text-gray-400 font-mono">KUOTA TURNITIN</label>
@@ -784,22 +816,32 @@ const totalRevenue =
                            </div>
                         </div>
                         <div className="flex gap-2 pt-2">
-                           {productForm.id && <button type="button" onClick={() => setProductForm({ id: null, name: '', description: '', price: '', quota_turnitin: '', quota_ai: '' })} className="flex-1 bg-white/5 py-3 rounded-xl text-xs font-bold text-gray-400 hover:text-white transition-all">Batal</button>}
+                           {productForm.id && <button type="button" onClick={() => setProductForm({ id: null, name: '', description: '', price: '', stock: '', quota_turnitin: '', quota_ai: '' })} className="flex-1 bg-white/5 py-3 rounded-xl text-xs font-bold text-gray-400 hover:text-white transition-all">Batal</button>}
                            <button type="submit" className="flex-1 bg-purple-600 hover:bg-purple-500 py-3 rounded-xl text-xs font-bold text-white transition-all"><Save size={14} className="inline mr-2"/>Simpan</button>
                         </div>
                      </form>
                   </div>
+                  
                   <div className="col-span-2 bg-white/5 p-6 rounded-2xl border border-white/10">
                      <h3 className="text-sm font-mono text-purple-400 mb-4 uppercase tracking-widest">Daftar Paket Aktif</h3>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {products.map(p => (
-                          <div key={p.id} className="bg-black/40 p-4 rounded-xl border border-white/5 flex justify-between items-center shadow-lg">
+                          <div key={p.id} className="bg-black/40 p-4 rounded-xl border border-white/5 flex justify-between items-center shadow-lg relative overflow-hidden">
+                             {/* INDIKATOR STOK KOSONG */}
+                             {p.stock <= 0 && <div className="absolute top-0 right-0 bg-red-600 text-white text-[8px] font-black uppercase px-2 py-1 rounded-bl-lg tracking-widest z-10">HABIS</div>}
+                             
                              <div>
-                                <p className="font-bold text-white text-base">{p.name}</p>
-                                <p className="text-xs text-purple-400 font-mono">Rp {p.price.toLocaleString()}</p>
-                                <p className="text-[10px] text-gray-400 font-mono mt-1">Turnitin: {p.quota_turnitin}x | AI: {p.quota_ai}x</p>
+                                <p className={`font-bold text-base ${p.stock <= 0 ? 'text-gray-500 line-through' : 'text-white'}`}>{p.name}</p>
+                                <p className="text-xs text-purple-400 font-mono mb-1">Rp {p.price.toLocaleString()}</p>
+                                
+                                <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-mono font-bold mb-1 ${p.stock > 0 ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
+                                   STOK: {p.stock || 0} Buah
+                                </span>
+                                
+                                <p className="text-[9px] text-gray-400 font-mono mt-1">Turnitin: {p.quota_turnitin}x | AI: {p.quota_ai}x</p>
                              </div>
-                             <div className="flex gap-2">
+                             
+                             <div className="flex gap-2 relative z-10">
                                 <button onClick={() => setProductForm(p)} className="p-2 bg-purple-600/20 text-purple-400 rounded-lg hover:bg-purple-600 hover:text-white transition-all"><Edit3 size={14}/></button>
                                 <button onClick={() => handleDeleteProduct(p.id)} className="p-2 bg-red-600/20 text-red-400 rounded-lg hover:bg-red-600 hover:text-white transition-all"><Trash2 size={14}/></button>
                              </div>
