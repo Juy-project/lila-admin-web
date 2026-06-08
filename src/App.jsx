@@ -880,8 +880,7 @@ const totalRevenue =
               <button onClick={handleSendBroadcast} disabled={broadcastLoading} className={`w-full py-4 rounded-xl text-xs font-black uppercase tracking-widest text-white shadow-lg transition-all active:scale-95 ${ broadcastLoading ? 'bg-gray-700 cursor-not-allowed opacity-60' : 'bg-purple-600 hover:bg-purple-500' }`} > {broadcastLoading ? 'MENGIRIM BROADCAST...' : 'KIRIM BROADCAST SEKARANG'} </button>              </div>
             </div>
           )}
-
-          {/* --- TAB PENGATURAN --- */}
+{/* --- TAB PENGATURAN --- */}
           {activeTab === 'settings' && (
             <div className="max-w-3xl space-y-8 pb-20 animate-in fade-in">
                <h2 className="text-xl font-black uppercase text-white">Pengaturan Sistem</h2>
@@ -910,7 +909,6 @@ const totalRevenue =
                   </div>
                </div>
 
-               {/* INI YANG TADI KELUPAAN JUGA: QRIS DAN BOT TOKEN */}
                <div className="bg-white/5 border border-white/10 p-6 rounded-2xl space-y-4 shadow-xl">
                   <h3 className="text-xs font-mono text-purple-400 uppercase tracking-widest">PENGATURAN KONEKSI & QRIS</h3>
                   <div className="flex flex-col md:flex-row gap-6 items-center">
@@ -939,6 +937,21 @@ const totalRevenue =
                      </div>
                   </div>
                   <input type="checkbox" checked={config.maintenance_mode || false} onChange={e => setConfig({...config, maintenance_mode: e.target.checked})} className="w-5 h-5 rounded border-white/10 text-red-600 focus:ring-0" />
+               </div>
+
+               <div className="bg-white/5 border border-white/10 p-6 rounded-2xl space-y-4 shadow-xl">
+                  <h3 className="text-xs font-mono text-cyan-400 border-b border-white/5 pb-2 uppercase tracking-widest"><Package size={14} className="inline mr-2"/> Stok Pengecekan Global (Harian)</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[9px] text-gray-400 font-mono block mb-1">STOK SERVER TURNITIN</label>
+                      <input type="number" value={config.stock_turnitin || 0} onChange={e=>setConfig({...config, stock_turnitin: parseInt(e.target.value) || 0})} className="w-full bg-black/50 p-3 rounded-xl text-xs text-white outline-none focus:border-cyan-500 border border-transparent" />
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-gray-400 font-mono block mb-1">STOK SERVER AI</label>
+                      <input type="number" value={config.stock_ai || 0} onChange={e=>setConfig({...config, stock_ai: parseInt(e.target.value) || 0})} className="w-full bg-black/50 p-3 rounded-xl text-xs text-white outline-none focus:border-cyan-500 border border-transparent" />
+                    </div>
+                  </div>
+                  <p className="text-[9px] text-gray-500 font-mono">INFO: Jika diset 0, bot akan menolak file masuk meskipun pelanggan masih memiliki kuota.</p>
                </div>
 
                <button onClick={handleSaveSettings} className="w-full bg-purple-600 py-4 rounded-xl font-bold text-white uppercase hover:bg-purple-500 transition-all shadow-xl"><Save size={16} className="inline mr-2"/> Simpan Pengaturan</button>
